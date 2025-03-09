@@ -1,4 +1,5 @@
 # VaultQuest - Obsidian Gamification Plugin 🎮✨📜
+[![GitHub release (Latest by date)](https://img.shields.io/github/v/release/unseensholar/VaultQuest)](https://github.com/unseensholar/VaultQuest/releases) ![GitHub all releases](https://img.shields.io/github/downloads/unseensholar/VaultQuest/total?color=success)
 
 VaultQuest is an Obsidian plugin that gamifies your note-taking experience by awarding XP and points for writing and completing tasks. Earn XP as you type, level up, and track your progress. 🏆📝🚀
 
