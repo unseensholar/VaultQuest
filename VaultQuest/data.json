@@ -1,0 +1,17 @@
+{
+  "xpPerCharacter": 1,
+  "pointsBaseValue": 10,
+  "tagMultipliers": {
+    "#easy": 0.5,
+    "#medium": 1,
+    "#hard": 2,
+    "#boss": 5
+  },
+  "apiUrl": "http://localhost:1234",
+  "apiKey": "your-api-key",
+  "trackedNotes": [
+    "Gamify Obsidian.md"
+  ],
+  "removeTagOnUncheck": true,
+  "enableBeholder": true
+}

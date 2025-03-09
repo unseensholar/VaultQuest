@@ -1,0 +1,131 @@
+/* VaultQuest styles.css */
+
+.gamify-stat-card-modal {
+    max-width: 500px;
+}
+
+.stat-card-stats,
+.stat-card-stats-details,
+.stat-card-skills,
+.stat-card-redeem {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
+}
+
+.xp-bar {
+    width: 100%;
+    height: 10px;
+    background-color: var(--background-modifier-border);
+    border-radius: 5px;
+    margin: 10px 0;
+    overflow: hidden;
+}
+
+.xp-bar-fill {
+    height: 100%;
+    background-color: var(--interactive-accent);
+    border-radius: 5px;
+}
+
+.redeem-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/* Base styles for the modal */
+.gamify-stat-card-modal {
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    padding: 1rem;
+}
+
+/* Title styling */
+.gamify-modal-title {
+    color: var(--text-accent);
+    margin-bottom: 1rem;
+    text-align: center;
+    font-size: 1.8rem;
+}
+
+/* Section headings */
+.gamify-section-heading {
+    color: var(--text-accent);
+    margin: 1rem 0 0.5rem;
+    font-size: 1.4rem;
+}
+
+/* Stats containers */
+.gamify-stats-container,
+.gamify-stats-details,
+.gamify-skills-section,
+.gamify-redeem-section {
+    margin-bottom: 1.5rem;
+    padding: 0.75rem;
+    border-radius: 4px;
+    background-color: var(--background-secondary);
+}
+
+/* XP Bar styling */
+.gamify-xp-bar {
+    height: 10px;
+    background-color: var(--background-modifier-border);
+    border-radius: 5px;
+    margin: 0.5rem 0;
+    overflow: hidden;
+}
+
+.gamify-xp-bar-fill {
+    height: 100%;
+    background-color: var(--text-accent);
+    border-radius: 5px;
+    transition: width 0.3s ease-in-out;
+}
+
+/* Stat items */
+.gamify-stat-item {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+}
+
+/* Skills list */
+.gamify-skills-list {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+
+.gamify-skill-item {
+    margin: 0.25rem 0;
+}
+
+/* Button styling */
+.gamify-summon-button {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: 1px solid var(--interactive-accent-hover);
+}
+
+.gamify-summon-button:hover {
+    background-color: var(--interactive-accent-hover);
+}
+
+/* Task result container */
+.task-result-container {
+    max-height: 400px;
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    margin: 10px 0;
+    background-color: var(--background-secondary);
+}
+
+.theme-dark .gamify-stat-card-modal {
+    /* Dark theme specific styles */
+}
+
+.theme-light .gamify-stat-card-modal {
+    /* Light theme specific styles */
+}
