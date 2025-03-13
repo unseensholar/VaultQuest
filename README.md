@@ -1,14 +1,48 @@
 # VaultQuest - Obsidian Gamification Plugin 🎮✨📜
-![GitHub Release](https://img.shields.io/github/v/release/unseensholar/VaultQuest)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/unseensholar/VaultQuest/total)
 
+## Changelog
+### v0.3.0 - Major Update
+
+#### New Features
+- **Item Store System**  
+  - Added an Item Store Service, allowing users to redeem items and effects using reward points.
+  - Added Timed Effects: Timed active effects (buffs) added to Item Store.
+  
+- **LLM Model Configuration**  
+  - Added persistent configuration options for LLM in settings. When used with LM studio, the saved LLM model will be automatically loaded and used if the option is enabled.
+  
+- **Added Commands**  
+  - Integrated new commands into the Obsidian command palette and ribbon.
+
+#### Improvements
+- **Reworked Task Tracking & Reward System**  
+  - Overhauled the underlying logic for task tracking and reward allocation.
+  
+- **Codebase Refactoring & Module Initialization**  
+  - Refactored significant portions of the code for enhanced maintainability.
+
+#### Bug Fixes
+- Addressed various minor bugs affecting state management and event handling to ensure a more stable and reliable user experience.
+
+#### Planned Updates
+- [ ] **Achievements & Rewards**
+- [ ] **More Skill Categories**
+- [ ] **Activities and Quests**
+- [x] **Item Shop**
+- [ ] **Theme Engine**
+- [ ] **Notification Sounds**
+- [ ] **Level Up System Improvement**
+- [ ] **Status Indicators**
+- [ ] **LLM Interactions**
+
+---
 
 VaultQuest is an Obsidian plugin that gamifies your note-taking experience by awarding XP and points for writing and completing tasks. Earn XP as you type, level up, and track your progress. 🏆📝🚀
 
 ## Why? 🤔
 A long time back, I worked on a project to 'gamify' a Discord server with XP gain, text-based battles, and a whole RPG-like system with skills, items, shops, hidden channels, and quests. I had a blast designing the lore and mechanics back then, but trying to get it running again on Discord was tiring.
 
-Since I use Obsidian every day, I tried some of the gamification plugins, but nothing really scratched the itch. So, I figured I’d repurpose my old scripts for something I’d actually use, for myself and anyone else who’d enjoy it. 
+Since I use Obsidian every day, I tried some of the gamification plugins, but nothing really scratched the itch. So, I figured I’d repurpose my old scripts for something I’d actually use, for myself and anyone else who’d enjoy it.
 
 Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-powered task evaluator. The AI entity determines task difficulty, assigns points, and allows users to spend points for custom AI-generated responses.
 
@@ -72,8 +106,12 @@ Settings are adjustable via the Obsidian plugin settings panel:
 - **Item Store & Economy System**
 
 ## Bug Fixes 🐞
-- [ ] Bug fix: Checking multiple tasks in rapid succession bugs out the tag update feature
-- [ ] Bug fix: Unchecking multiple tasks in rapid succession bugs out the tag update feature 
-- [ ] Bug fix: Unchecking and checking a task again does not assign removed tag 
-- [ ] Bug fix: Aggressive replacement of '#VQdone' by tag update - unique situation where the tag is used in the same sentence as the tag during testing
-- [ ] Bug fix: Handling of invalid LLM response and fallback system
+- [x] Bug fix: Checking multiple tasks in rapid succession bugs out the tag update feature.
+- [x] Bug fix: Unchecking multiple tasks in rapid succession bugs out the tag update feature.
+- [x] Bug fix: Unchecking and checking a task again does not assign removed tag.
+- [x] Bug fix: Aggressive replacement of '#VQdone' by tag update – unique situation where the tag is used in the same sentence as the tag during testing.
+- [x] Bug fix: Handling of invalid LLM response and fallback system.
+
+## Support me
+
+<a href='https://ko-fi.com/unseenscholar' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi1.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
