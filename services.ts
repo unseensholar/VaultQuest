@@ -1,5 +1,6 @@
 import { App, Notice, Modal, TFile, TextComponent, ButtonComponent, Vault } from 'obsidian';
 import GamifyPlugin from './main';
+import { ItemStoreModal, ItemStoreService } from './itemStore';
 
 export class StatCardService {
     private plugin: GamifyPlugin;
@@ -10,11 +11,9 @@ export class StatCardService {
     }
 
     initializeUI() {
-
         this.plugin.addRibbonIcon('shield', 'Open Grimoire', (evt: MouseEvent) => {
             new StatCardModal(this.plugin.app, this.plugin).open();
         });
-
 
         this.statusBarItem = this.plugin.addStatusBarItem();
         this.updateStatusBar();
@@ -42,6 +41,7 @@ export class LLMTaskService {
     private lastFileCount: number = 0;
     private lastFolderCount: number = 0;
     private keyboardListener: (e: KeyboardEvent) => void;
+    private intervalId: number | null = null;
 
     constructor(plugin: GamifyPlugin) {
         this.plugin = plugin;
@@ -54,50 +54,64 @@ export class LLMTaskService {
         this.updateFileFolderCounts();
         
         // Set up interval to check for changes in file/folder structure
-        setInterval(() => this.updateFileFolderCounts(), 60000*5); // Check every 5 minutes - revisit
+        this.intervalId = window.setInterval(() => this.updateFileFolderCounts(), 60000*5); // Check every 5 minutes
+        
+        // Load previous counts if available
+        this.lastFileCount = this.plugin.statCardData.stats.lastFileCount || 0;
+        this.lastFolderCount = this.plugin.statCardData.stats.lastFolderCount || 0;
     }
 
     // Handle keyboard events to track writing skill
     private handleKeyPress(e: KeyboardEvent): void {
-
         if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter') {
             this.keyPressCount++;
             
-
             if (this.keyPressCount >= 50) {
-                this.updateWritingSkill(this.keyPressCount);
-                this.keyPressCount = 0; // Reset counter logic needs work
+                try {
+                    this.updateWritingSkill(this.keyPressCount);
+                    this.keyPressCount = 0; // Only reset if successful
+                } catch (error) {
+                    console.error("Error updating writing skill:", error);
+                    // Don't reset counter on error
+                }
             }
         }
     }
 
     // Count files and folders in the vault
     private async updateFileFolderCounts(): Promise<void> {
-        const vault = this.plugin.app.vault;
-        
-        // Get all files in the vault - revisit
-        const allFiles = vault.getFiles();
-        const fileCount = allFiles.length;
-        
-
-        const folders = new Set<string>();
-        allFiles.forEach(file => {
-            const parentPath = file.parent?.path;
-            if (parentPath && parentPath !== '/') {
-                folders.add(parentPath);
+        try {
+            const vault = this.plugin.app.vault;
+            
+            // Get all files in the vault
+            const allFiles = vault.getFiles();
+            const fileCount = allFiles.length;
+            
+            const folders = new Set<string>();
+            allFiles.forEach(file => {
+                const parentPath = file.parent?.path;
+                if (parentPath && parentPath !== '/') {
+                    folders.add(parentPath);
+                }
+            });
+            const folderCount = folders.size;
+            
+            // Store counts in plugin data for persistence
+            this.plugin.statCardData.stats.lastFileCount = fileCount;
+            this.plugin.statCardData.stats.lastFolderCount = folderCount;
+            await this.plugin.saveStatCardData();
+            
+            if (fileCount !== this.lastFileCount) {
+                this.updateResearchSkill(fileCount);
+                this.lastFileCount = fileCount;
             }
-        });
-        const folderCount = folders.size;
-        
-
-        if (fileCount !== this.lastFileCount) {
-            this.updateResearchSkill(fileCount);
-            this.lastFileCount = fileCount;
-        }
-        
-        if (folderCount !== this.lastFolderCount) {
-            this.updateOrganizationSkill(folderCount);
-            this.lastFolderCount = folderCount;
+            
+            if (folderCount !== this.lastFolderCount) {
+                this.updateOrganizationSkill(folderCount);
+                this.lastFolderCount = folderCount;
+            }
+        } catch (error) {
+            console.error("Error updating file/folder counts:", error);
         }
     }
 
@@ -134,10 +148,18 @@ export class LLMTaskService {
     private updateSkill(skill: any, xpAmount: number): void {
         if (xpAmount <= 0) return;
         
-
+        // Apply XP multiplier if active
+        if (this.plugin.statCardData.activeEffects?.xpMultiplier) {
+            const multiplier = this.plugin.statCardData.activeEffects.xpMultiplier;
+            const now = Date.now();
+            
+            if (multiplier.expiresAt > now) {
+                xpAmount = Math.floor(xpAmount * multiplier.value);
+            }
+        }
+        
         skill.xp += xpAmount;
         
-
         const nextLevel = skill.level + 1;
         const xpForNextLevel = nextLevel * 25; // level up formula needs work
         
@@ -149,7 +171,6 @@ export class LLMTaskService {
             // Add points when leveling up skills
             this.plugin.statCardData.points += nextLevel * 2;
             
-
             this.plugin.saveStatCardData();
         }
     }
@@ -158,7 +179,6 @@ export class LLMTaskService {
         // First determine the cost of this request
         const pointsCost = await this.determineTaskCost(instruction);
         
-
         if (this.plugin.statCardData.points < pointsCost) {
             throw new Error(`Not enough points. You need ${pointsCost} points to perform this action.`);
         }
@@ -168,7 +188,7 @@ export class LLMTaskService {
             this.plugin.statCardData.points -= pointsCost;
             await this.plugin.saveStatCardData();
 
-            // Prepare the LLM query with function calling - may need to be changed for other use cases - revisit
+            // Prepare the LLM query with function calling
             const functions = [
                 {
                     "name": "perform_task",
@@ -206,7 +226,10 @@ export class LLMTaskService {
                 }
             ];
 
-            // Make the API call
+            // Make the API call with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+            
             const response = await fetch(`${this.plugin.settings.apiUrl}/v1/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -218,11 +241,15 @@ export class LLMTaskService {
                     messages: messages,
                     tools: [{ "type": "function", "function": functions[0] }],
                     tool_choice: { "type": "function", "function": { "name": "perform_task" } }
-                })
+                }),
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
-                throw new Error(`API error: ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`API error: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
@@ -234,8 +261,12 @@ export class LLMTaskService {
                 const toolCall = data.choices[0].message.tool_calls[0];
                 const functionArgs = JSON.parse(toolCall.function.arguments);
                 
-                // Save result to vault - revisit
-                await this.saveResultToVault(functionArgs.result, functionArgs.title, pointsCost);
+                // Update task count
+                this.plugin.statCardData.stats.tasksCompleted++;
+                await this.plugin.saveStatCardData();
+                
+                // Save result to vault
+                await this.saveResultToVault(functionArgs.result, functionArgs.title || "Untitled Task", pointsCost);
                 
                 return functionArgs.result;
             }
@@ -244,14 +275,19 @@ export class LLMTaskService {
         } catch (error) {
             console.error("Error executing LLM task:", error);
             
-            // Refund points if execution failed - probably need some other failsafe too
+            // Refund points if execution failed
             this.plugin.statCardData.points += pointsCost;
             await this.plugin.saveStatCardData();
+            
+            if (error.name === 'AbortError') {
+                throw new Error("The request timed out. The dark powers are not responding.");
+            }
             
             throw error;
         }
     }
-	public async determineTaskCost(instruction: string): Promise<number> {
+
+    public async determineTaskCost(instruction: string): Promise<number> {
         try {
             const functions = [
                 {
@@ -290,6 +326,10 @@ export class LLMTaskService {
                 }
             ];
 
+            // Add timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+            
             const response = await fetch(`${this.plugin.settings.apiUrl}/v1/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -301,11 +341,15 @@ export class LLMTaskService {
                     messages: messages,
                     tools: [{ "type": "function", "function": functions[0] }],
                     tool_choice: { "type": "function", "function": { "name": "determine_cost" } }
-                })
+                }),
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
-                throw new Error(`API error: ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`API error: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
@@ -316,12 +360,25 @@ export class LLMTaskService {
                 const toolCall = data.choices[0].message.tool_calls[0];
                 const functionArgs = JSON.parse(toolCall.function.arguments);
                 
-                return Math.round(functionArgs.points);
+                let cost = Math.round(functionArgs.points);
+                
+                if (this.plugin.statCardData.activeEffects?.taskDiscount) {
+                    const discount = this.plugin.statCardData.activeEffects.taskDiscount;
+                    const now = Date.now();
+                    
+                    if (discount.expiresAt > now) {
+                        cost = Math.max(1, Math.floor(cost * (1 - discount.value)));
+                    }
+                }	
+                return cost;				
             }
             
             throw new Error("Could not determine task cost");
         } catch (error) {
             console.error("Error determining task cost:", error);
+            if (error.name === 'AbortError') {
+                throw new Error("The request timed out. The dark powers are not responding.");
+            }
             // Fallback to default cost
             return 10;
         }
@@ -329,7 +386,6 @@ export class LLMTaskService {
 
     private async saveResultToVault(content: string, title: string, pointsCost: number): Promise<void> {
         try {
-
             const folderPath = 'VQ';
             const folder = this.plugin.app.vault.getAbstractFileByPath(folderPath);
             
@@ -340,10 +396,9 @@ export class LLMTaskService {
             // Generate a unique filename with timestamp and random string
             const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '');
             const randomStr = Math.random().toString(36).substring(2, 8);
-            const safeTitle = title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+            const safeTitle = title ? title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20) : 'untitled';
             const filename = `${folderPath}/${timestamp}_${safeTitle}_${randomStr}.md`;
             
-
             const fileContent = `---
 title: ${title}
 created: ${new Date().toISOString()}
@@ -357,7 +412,6 @@ ${content}
 *the portal closes....*
 `;
             
-
             await this.plugin.app.vault.create(filename, fileContent);
             
             new Notice(`Task result saved to ${filename}`);
@@ -367,9 +421,12 @@ ${content}
         }
     }
     
-
     public destroy(): void {
         document.removeEventListener('keydown', this.keyboardListener);
+        if (this.intervalId !== null) {
+            window.clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
     }
 }
 
@@ -392,7 +449,6 @@ export class RedeemTaskModal extends Modal {
             text: `Points Available: ${this.plugin.statCardData.points}`
         });
         
-
         contentEl.createEl('label', {text: 'What do you wish to request from the darkness?'});
         
         const instructionInput = new TextComponent(contentEl)
@@ -401,13 +457,10 @@ export class RedeemTaskModal extends Modal {
                 this.instruction = value;
             });
         
-
-
         const inputEl = instructionInput.inputEl;
         inputEl.style.width = '100%';
         inputEl.style.height = '100px';
         
-
         const buttonContainer = contentEl.createDiv({cls: 'redeem-buttons'});
         
         new ButtonComponent(buttonContainer)
@@ -481,7 +534,6 @@ export class TaskResultModal extends Modal {
         
         contentEl.createEl('h2', {text: 'Dark Powers Response'});
         
-
         const resultContainer = contentEl.createDiv({cls: 'task-result-container'});
         resultContainer.style.maxHeight = '400px';
         resultContainer.style.overflow = 'auto';
@@ -489,17 +541,14 @@ export class TaskResultModal extends Modal {
         resultContainer.style.border = '1px solid var(--background-modifier-border)';
         resultContainer.style.margin = '10px 0';
         
-
-		const MarkdownIt = (window as any).markdownit;
+        const MarkdownIt = (window as any).markdownit;
         if (MarkdownIt) {
             const md = new MarkdownIt();
             resultContainer.innerHTML = md.render(this.result);
         } else {
-
             resultContainer.innerHTML = this.result.replace(/\n/g, '<br>');
         }
         
-
         const buttonContainer = contentEl.createDiv({cls: 'task-result-buttons'});
         
         new ButtonComponent(buttonContainer)
@@ -528,12 +577,10 @@ export class StatCardModal extends Modal {
         const {contentEl} = this;
         contentEl.empty();
         
-
         contentEl.addClass('gamify-stat-card-modal');
         
         contentEl.createEl('h2', {text: 'Grimoire', cls: 'gamify-modal-title'});
         
-
         const statsContainer = contentEl.createDiv({cls: 'gamify-stats-container'});
         statsContainer.createEl('h3', {text: `Level ${this.plugin.statCardData.level} Soul Binder`, cls: 'gamify-stats-heading'});
         
@@ -552,7 +599,6 @@ export class StatCardModal extends Modal {
             cls: 'gamify-stat-item'
         });
         
-
         const statsSection = contentEl.createDiv({cls: 'gamify-stats-details'});
         statsSection.createEl('h3', {text: 'Pact Details', cls: 'gamify-section-heading'});
         
@@ -566,7 +612,6 @@ export class StatCardModal extends Modal {
             cls: 'gamify-stat-item'
         });
         
-
         const skillsSection = contentEl.createDiv({cls: 'gamify-skills-section'});
         skillsSection.createEl('h3', {text: 'Skills', cls: 'gamify-section-heading'});
         
@@ -577,7 +622,6 @@ export class StatCardModal extends Modal {
                 cls: 'gamify-skill-item'
             });
         }
-        
 
         const redeemSection = contentEl.createDiv({cls: 'gamify-redeem-section'});
         redeemSection.createEl('h3', {text: 'Summon Dark Powers', cls: 'gamify-section-heading'});
@@ -589,9 +633,60 @@ export class StatCardModal extends Modal {
                 new RedeemTaskModal(this.app, this.plugin).open();
             });
         
-
+        if (this.plugin.statCardData.activeEffects && 
+            Object.keys(this.plugin.statCardData.activeEffects).length > 0) {
+            
+            const effectsSection = contentEl.createDiv({cls: 'gamify-active-effects'});
+            effectsSection.createEl('h4', {text: 'Active Dark Powers'});
+            
+            const now = Date.now();
+            
+            for (const [key, effect] of Object.entries(this.plugin.statCardData.activeEffects)) {
+                if (effect.expiresAt && effect.expiresAt > now) {
+                    const timeLeft = Math.floor((effect.expiresAt - now) / (60 * 1000)); // minutes
+                    const effectEl = effectsSection.createDiv({cls: 'gamify-effect-item'});
+                    
+                    let effectName = 'Unknown Effect';
+                    let effectValue = '';
+                    
+                    switch (key) {
+                        case 'taskDiscount':
+                            effectName = 'Ritual Discount';
+                            effectValue = `${effect.value * 100}%`;
+                            break;
+                        case 'xpMultiplier':
+                            effectName = 'Soul Energy Multiplier';
+                            effectValue = `${effect.value}x`;
+                            break;
+                    }
+                    
+                    effectEl.createEl('span', {text: `${effectName}: ${effectValue}`});
+                    effectEl.createEl('span', {text: `${timeLeft} min remaining`});
+                }
+            }
+        }
+        
         const buttonEl = redeemButton.buttonEl;
-        buttonEl.addClass('gamify-summon-button');
+        buttonEl.addClass('gamify-summon-button');			
+
+        // Check for and display familiar if owned
+        if (this.plugin.statCardData.hasFamiliar) {
+            const familiarSection = contentEl.createDiv({cls: 'gamify-familiar-section'});
+            familiarSection.createEl('h4', {text: 'Bound Familiar'});
+            familiarSection.createEl('p', {
+                text: 'Your demonic familiar is bound to your service, providing daily benefits.'
+            });
+        }
+        
+        const storeButton = new ButtonComponent(redeemSection)
+            .setButtonText('Visit Item Store')
+            .onClick(() => {
+                this.close();
+                new ItemStoreModal(this.app, this.plugin, this.plugin.itemStoreService).open();
+            });
+
+        const storeButtonEl = storeButton.buttonEl;
+        storeButtonEl.addClass('gamify-store-button');
     }
     
     onClose() {

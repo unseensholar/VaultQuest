@@ -1,6 +1,6 @@
 {
   "name": "vaultquest",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Gamify your note-taking experience in Obsidian",
   "main": "main.js",
   "scripts": {
@@ -25,5 +25,8 @@
     "obsidian": "latest",
     "tslib": "2.4.0",
     "typescript": "4.7.4"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0"
   }
 }
