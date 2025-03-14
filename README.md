@@ -107,9 +107,6 @@ Settings are adjustable via the Obsidian plugin settings panel:
 
 ## Bug Fixes 🐞
 - [x] Bug fix: Checking multiple tasks in rapid succession bugs out the tag update feature.
-- [x] Bug fix: Unchecking multiple tasks in rapid succession bugs out the tag update feature.
-- [x] Bug fix: Unchecking and checking a task again does not assign removed tag.
-- [x] Bug fix: Aggressive replacement of '#VQdone' by tag update – unique situation where the tag is used in the same sentence as the tag during testing.
 - [x] Bug fix: Handling of invalid LLM response and fallback system.
 
 ## Support me
