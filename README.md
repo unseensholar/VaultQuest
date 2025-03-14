@@ -1,5 +1,15 @@
 # VaultQuest - Obsidian Gamification Plugin 🎮✨📜
 
+VaultQuest is an Obsidian plugin that gamifies your note-taking experience by awarding XP and points for writing and completing tasks. Earn XP as you type, level up, and track your progress. 🏆📝🚀
+
+## Why? 🤔
+A long time back, I worked on a project to 'gamify' a Discord server with XP gain, text-based battles, and a whole RPG-like system with skills, items, shops, hidden channels, and quests. I had a blast designing the lore and mechanics back then, but trying to get it running again on Discord was tiring.
+
+Since I use Obsidian every day, I tried some of the gamification plugins, but nothing really scratched the itch. So, I figured I’d repurpose my old scripts for something I’d actually use, for myself and anyone else who’d enjoy it.
+
+Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-powered task evaluator. The AI entity determines task difficulty, assigns points, and allows users to spend points for custom AI-generated responses.
+---
+
 ## Changelog
 ### v0.3.0 - Major Update
 
@@ -36,16 +46,6 @@
 - [ ] **LLM Interactions**
 
 ---
-
-VaultQuest is an Obsidian plugin that gamifies your note-taking experience by awarding XP and points for writing and completing tasks. Earn XP as you type, level up, and track your progress. 🏆📝🚀
-
-## Why? 🤔
-A long time back, I worked on a project to 'gamify' a Discord server with XP gain, text-based battles, and a whole RPG-like system with skills, items, shops, hidden channels, and quests. I had a blast designing the lore and mechanics back then, but trying to get it running again on Discord was tiring.
-
-Since I use Obsidian every day, I tried some of the gamification plugins, but nothing really scratched the itch. So, I figured I’d repurpose my old scripts for something I’d actually use, for myself and anyone else who’d enjoy it.
-
-Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-powered task evaluator. The AI entity determines task difficulty, assigns points, and allows users to spend points for custom AI-generated responses.
-
 ## Features 🚀
 - **XP for Writing**: Gain XP and level up as you type.
 - **Task-Based Points**: Earn points for completing tasks, with difficulty-based scoring.
