@@ -9,9 +9,38 @@ A long time back, I worked on a project to 'gamify' a Discord server with XP gai
 Since I use Obsidian every day, I tried some of the gamification plugins, but nothing really scratched the itch. So, I figured I’d repurpose my old scripts for something I’d actually use, for myself and anyone else who’d enjoy it.
 
 Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-powered task evaluator. The AI entity determines task difficulty, assigns points, and allows users to spend points for custom AI-generated responses.
+
 ---
 
 ## Changelog
+### v0.4.0
+#### UI & UX Enhancements
+- Redesigned Progress Window in plugin settings.
+- Redesigned Stats Window for better readability.
+- Reworked Status Card to display items, achievements, titles, and effects.
+- Redesigned Store UI for a smoother experience.
+- Process Indicator added to ribbon for better UX feedback.
+- Refresh UI Button added to ribbon.
+- Usage Instructions updated.
+
+#### New Features
+- Unlockable Theme Switcher added with new themes available in the store.
+- Inventory Tab added to showcase owned items.
+- Achievements System implemented with default and custom achievements. Instructions will be provided.
+- Titles added to the Item Store to enhance customization.
+- Custom Store Items introduced for personalized game elements.
+- Level-Up Rewards updated for better progression balance.
+
+#### Functional & Command Improvements
+- LLM Request Button added to the ribbon for quick AI interactions.
+- Store Access Button moved to ribbon and corresponding command added.
+- Added Debug Menu for troubleshooting.
+
+#### Bug Fixes & Data Handling
+- Data storage location moved to `QuestLog` folder in root directory.
+- Fixed data saving bug that occasionally caused resets (user feedback required).
+- Temporarily disabled item usage from Inventory Tab (pending refinement).
+
 ### v0.3.0 - Major Update
 
 #### New Features
