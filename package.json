@@ -1,6 +1,6 @@
 {
   "name": "vaultquest",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Gamify your note-taking experience in Obsidian",
   "main": "main.js",
   "scripts": {

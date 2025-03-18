@@ -19,20 +19,16 @@ export class TaskStorageViewer extends Modal {
         contentEl.empty();
         contentEl.addClass('vq-task-storage-viewer');
         
-        // Header
         contentEl.createEl('h2', { text: 'Task Storage Viewer' });
-        
-        // Filters
+       
         const filterContainer = contentEl.createDiv({ cls: 'vq-filter-container' });
         
-        // Text filter
         this.textFilter = new TextComponent(filterContainer)
             .setPlaceholder('Filter by text or file path')
             .onChange(async (value) => {
                 await this.renderTaskList(value, this.statusFilter);
             });
         
-        // Completed filter
         const filterOptions = ['all', 'completed', 'uncompleted'];
         new Setting(filterContainer)
             .setName('Status')
@@ -48,7 +44,6 @@ export class TaskStorageViewer extends Modal {
                 return dropdown;
             });
                 
-        // Action buttons
         const actionContainer = contentEl.createDiv({ cls: 'vq-action-container' });
         
         new ButtonComponent(actionContainer)
@@ -67,7 +62,6 @@ export class TaskStorageViewer extends Modal {
                 }
             });
         
-        // Task list container
         contentEl.createDiv({ cls: 'vq-task-list-container' });
 
         const style = document.createElement('style');
@@ -84,7 +78,6 @@ export class TaskStorageViewer extends Modal {
         `;
         document.head.appendChild(style);
         
-        // Initial render
         await this.renderTaskList('', 'all');
     }
     
@@ -94,17 +87,13 @@ export class TaskStorageViewer extends Modal {
         if (!taskListContainer) return;
         taskListContainer.empty();
         
-        // Load tasks
         const tasks = await this.taskAssessmentService.loadTaskStorage();
         
-        // Filter tasks
         const filteredTasks = tasks.filter(task => {
-            // Text filter
             const textMatch = !textFilter || 
                 task.taskText.toLowerCase().includes(textFilter.toLowerCase()) ||
                 task.filePath.toLowerCase().includes(textFilter.toLowerCase());
             
-            // Status filter
             let statusMatch = true;
             if (statusFilter === 'completed') {
                 statusMatch = task.completed;
@@ -115,16 +104,13 @@ export class TaskStorageViewer extends Modal {
             return textMatch && statusMatch;
         });
         
-        // Sort tasks by last updated
         filteredTasks.sort((a, b) => b.lastUpdated - a.lastUpdated);
         
-        // Show stats
         const statsEl = taskListContainer.createEl('div', { cls: 'vq-stats-container' });
         statsEl.createEl('p', { 
             text: `Showing ${filteredTasks.length} of ${tasks.length} tasks` 
         });
         
-        // Create task list
         if (filteredTasks.length === 0) {
             taskListContainer.createEl('p', { text: 'No tasks found.' });
             return;
@@ -132,7 +118,6 @@ export class TaskStorageViewer extends Modal {
         
         const table = taskListContainer.createEl('table', { cls: 'vq-task-table' });
         
-        // Headers
         const thead = table.createEl('thead');
         const headerRow = thead.createEl('tr');
         headerRow.createEl('th', { text: 'Status' });
@@ -143,34 +128,28 @@ export class TaskStorageViewer extends Modal {
         headerRow.createEl('th', { text: 'Last Updated' });
         headerRow.createEl('th', { text: 'Actions' });
         
-        // Task rows
         const tbody = table.createEl('tbody');
         
         for (const task of filteredTasks) {
             const row = tbody.createEl('tr');
             
-            // Status cell
             const statusCell = row.createEl('td');
             statusCell.createEl('span', { 
                 cls: `vq-status ${task.completed ? 'vq-completed' : 'vq-uncompleted'}`,
                 text: task.completed ? '✓' : '○'
             });
             
-            // Task text cell
             row.createEl('td', { 
                 cls: 'vq-task-text',
                 text: task.taskText.length > 50 ? task.taskText.slice(0, 50) + '...' : task.taskText
             }).setAttribute('title', task.taskText);
             
-            // File path cell
             const filePathParts = task.filePath.split('/');
             const fileName = filePathParts[filePathParts.length - 1];
             row.createEl('td', { text: fileName }).setAttribute('title', task.filePath);
             
-            // Points cell
             row.createEl('td', { cls: 'vq-points', text: task.points.toString() });
             
-            // Tags cell
             const tagsCell = row.createEl('td', { cls: 'vq-tags' });
             if (task.tags && task.tags.length > 0) {
                 for (const tag of task.tags) {
@@ -180,20 +159,17 @@ export class TaskStorageViewer extends Modal {
                 tagsCell.setText('None');
             }
             
-            // Date cell
             const date = new Date(task.lastUpdated);
             row.createEl('td', { 
                 text: date.toLocaleDateString() + ' ' + date.toLocaleTimeString() 
             });
             
-            // Actions cell
             const actionsCell = row.createEl('td', { cls: 'vq-actions' });
             
             new ButtonComponent(actionsCell)
                 .setButtonText('Go to')
                 .setTooltip('Open this file')
                 .onClick(() => {
-                    // Try to open the file
                     const file = this.app.vault.getAbstractFileByPath(task.filePath);
                     if (file && file instanceof TFile) {
                         const leaf = this.app.workspace.activeLeaf;
@@ -213,7 +189,6 @@ export class TaskStorageViewer extends Modal {
                 .setTooltip('Remove this task from storage')
                 .onClick(async () => {
                     if (confirm('Are you sure you want to delete this task from storage?')) {
-                        // Remove the task from storage
                         const tasks = await this.taskAssessmentService.loadTaskStorage();
                         const updatedTasks = tasks.filter(t => 
                             !(t.filePath === task.filePath && t.taskText === task.taskText)
@@ -231,7 +206,6 @@ export class TaskStorageViewer extends Modal {
     }
 }
 
-// Add this to your main plugin class:
 export class TaskStorageRibbonIcon {
     private plugin: GamifyPlugin;
     private taskAssessmentService: TaskAssessmentService;
@@ -240,7 +214,6 @@ export class TaskStorageRibbonIcon {
         this.plugin = plugin;
         this.taskAssessmentService = taskAssessmentService;
         
-        // Add ribbon icon
         const ribbonIconEl = this.plugin.addRibbonIcon(
             'list-checks',
             'View Task Storage',
