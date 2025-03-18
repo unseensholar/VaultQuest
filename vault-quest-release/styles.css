@@ -1,0 +1,780 @@
+/* VaultQuest styles.css */
+
+/* Base styles for the modal */
+.gamify-stat-card-modal {
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	padding: 1rem;
+}
+
+/* Title styling */
+.gamify-modal-title {
+	color: var(--text-accent);
+	margin-bottom: 1rem;
+	text-align: center;
+	font-size: 1.8rem;
+}
+
+
+/* Stats containers */
+.gamify-stats-container,
+.gamify-stats-details,
+.gamify-skills-section,
+.gamify-redeem-section {
+	margin-bottom: 1.5rem;
+	padding: 0.75rem;
+	border-radius: 4px;
+	background-color: var(--background-secondary);
+}
+
+/* XP Bar styling */
+.gamify-xp-bar {
+	height: 10px;
+	background-color: var(--background-modifier-border);
+	border-radius: 5px;
+	margin: 0.5rem 0;
+	overflow: hidden;
+}
+
+.gamify-xp-bar-fill {
+	height: 100%;
+	background-color: var(--text-accent);
+	border-radius: 5px;
+	transition: width 0.3s ease-in-out;
+}
+
+/* Stat items */
+.gamify-stat-item {
+	margin: 0.25rem 0;
+	font-size: 0.9rem;
+}
+
+/* Skills list */
+.gamify-skills-list {
+	margin: 0.5rem 0;
+	padding-left: 1.5rem;
+}
+
+.gamify-skill-item {
+	margin: 0.25rem 0;
+}
+
+.redeem-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/* Task Storage Viewer Styles */
+
+.vq-filter-container {
+    margin-bottom: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.vq-filter-container .setting-item {
+    border: none;
+    padding: 0;
+}
+
+.vq-filter-container .setting-item-control {
+    margin-left: 8px;
+}
+
+.vq-action-container {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 8px;
+}
+
+.vq-task-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.vq-task-table th,
+.vq-task-table td {
+    border: 1px solid var(--background-modifier-border);
+    padding: 8px;
+}
+
+.vq-task-table th {
+    background-color: var(--background-secondary);
+    text-align: left;
+}
+
+.vq-status {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    text-align: center;
+    line-height: 20px;
+    border-radius: 50%;
+}
+
+.vq-completed {
+    background-color: var(--interactive-success);
+    color: white;
+}
+
+.vq-uncompleted {
+    background-color: var(--background-modifier-border);
+}
+
+.vq-points {
+    text-align: center;
+    font-weight: bold;
+}
+
+.vq-tag {
+    display: inline-block;
+    background-color: var(--background-secondary);
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin-right: 4px;
+    margin-bottom: 4px;
+    font-size: 0.85em;
+}
+
+.vq-actions {
+    white-space: nowrap;
+}
+
+.vq-actions .clickable-icon {
+    padding: 0;
+    margin-right: 4px;
+}
+
+.vq-stats-container {
+    margin-bottom: 16px;
+    font-style: italic;
+}
+
+.vq-task-storage-viewer {
+    resize: both;  /* Allow resizing both horizontally and vertically */
+    overflow: auto; /* Ensure the content inside doesn't overflow */
+    max-width: 190vw; /* Optional: limit max width */
+    max-height: 190vh; /* Optional: limit max height */
+	position: relative; /* Ensure positioning works for resizing */
+    border: 1px solid #ccc; /* Optional: Add border for visibility */
+    padding: 10px; /* Optional: Adjust padding for the modal */
+}
+
+/* Task result container */
+.task-result-container {
+    max-height: 400px;
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    margin: 10px 0;
+    background-color: var(--background-secondary);
+}
+
+.theme-dark .gamify-stat-card-modal {
+    /* Dark theme specific styles */
+}
+
+.theme-light .gamify-stat-card-modal {
+    color: black;
+}
+
+/* Item Store Styles */
+.gamify-store-modal {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.gamify-points-display {
+    font-size: 1.2em;
+    margin-bottom: 15px;
+    color: var(--text-accent);
+    font-weight: bold;
+}
+
+.gamify-store-filter {
+    margin-bottom: 15px;
+}
+
+.gamify-store-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.gamify-store-item {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
+    padding: 15px;
+    background-color: var(--background-secondary);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.gamify-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.gamify-item-title {
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.gamify-item-cost {
+    font-weight: bold;
+    color: var(--text-accent);
+}
+
+.gamify-item-category {
+    font-size: 0.8em;
+    padding: 3px 8px;
+    border-radius: 10px;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+
+.gamify-category-boost {
+    background-color: rgba(100, 100, 255, 0.2);
+    color: var(--text-accent);
+}
+
+.gamify-category-ritual {
+    background-color: rgba(255, 100, 100, 0.2);
+    color: var(--text-error);
+}
+
+.gamify-category-artifact {
+    background-color: rgba(255, 200, 0, 0.2);
+    color: var(--text-warning);
+}
+
+.gamify-category-cosmetic {
+    background-color: rgba(100, 255, 100, 0.2);
+    color: var(--text-success);
+}
+
+.gamify-store-buttons {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+/* Active Effects Display */
+.gamify-active-effects {
+    margin-top: 15px;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
+    background-color: rgba(100, 0, 100, 0.1);
+}
+
+.gamify-active-effects h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.gamify-effect-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+}
+
+/* Store Button for StatCardModal */
+.gamify-store-button {
+    margin-top: 10px;
+    background-color: var(--background-modifier-success);
+}
+
+/* Container for each stat */
+.stat-control {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background-color: var(--background-secondary);
+}
+
+/* Label for stat */
+.stat-label {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+/* Horizontal layout for buttons + value */
+.stat-button-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+/* Button groups */
+.stat-button-group {
+    display: flex;
+    gap: 8px;  /* Adds padding between buttons */
+}
+
+/* Current Value */
+.stat-value {
+    min-width: 50px;
+    text-align: center;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+/* Buttons */
+.debug-button {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.decrease-button {
+    background-color: var(--background-modifier-error);
+    color: white;
+}
+.increase-button {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.debug-button:hover {
+    opacity: 0.8;
+}
+
+/* Title item container */
+.title-item {
+    border: 1px solid var(--background-modifier-border);
+    padding: 12px;
+    border-radius: 8px;
+    background-color: var(--background-secondary);
+    margin-bottom: 10px;
+}
+
+/* Title name */
+.title-item h4 {
+    margin: 0;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+/* Description */
+.title-description {
+    font-style: italic;
+    margin: 5px 0;
+}
+
+/* Unlock date */
+.title-unlock-date {
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+/* Effects list */
+.title-effects-list {
+    margin-top: 5px;
+    padding-left: 20px;
+}
+
+.title-effects-list li {
+    font-size: 0.9em;
+}
+
+/* Empty message */
+.debug-empty-message {
+    font-style: italic;
+    text-align: center;
+    opacity: 0.7;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 10px;
+  padding: 10px;
+}
+
+.inventory-slot {
+  width: 80px;
+  height: 80px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-secondary);
+}
+
+.item-name {
+  font-size: 10px;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+  text-transform: capitalize;
+}
+
+/* Grid layout for titles */
+.gamify-titles-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.gamify-title-item {
+    background-color: var(--background-secondary);
+    padding: 6px 10px;
+	text-align: center;
+    border-radius: 4px;
+    position: relative;
+}
+
+.gamify-title-name {
+    font-weight: 600;
+	text-align: center
+}
+
+/* Tooltip for title effects */
+.gamify-title-tooltip {
+    visibility: hidden;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    padding: 8px 12px;
+    border-radius: 4px;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    width: max-content;
+    max-width: 250px;
+    opacity: 0;
+    transition: opacity 0.2s;
+	color: var(--text-accent);
+	
+}
+
+.gamify-title-item:hover .gamify-title-tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+.gamify-title-effect {
+    display: block;
+    font-size: 0.9em;
+    padding: 2px 0;
+}
+
+.gamify-inventory-item {
+    background-color: var(--background-secondary);
+    padding: 8px;
+    border-radius: 4px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;	
+	
+}
+
+.gamify-item-name {
+    font-weight: 500;
+}
+
+/* Tooltip for item details */
+.gamify-item-tooltip {
+    visibility: hidden;
+    position: absolute;
+    background-color: var(--background-primary);
+	color: #fff;
+    border: 1px solid var(--background-modifier-border);
+    padding: 2px 6px;
+    border-radius: 2px;
+    z-index: 50;
+	width: 150px;
+	bottom: 100%;
+	left: 50%;	
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    max-width: 250px;
+    opacity: 0;
+	transform: translateX(-50%);
+	transition: opacity 0.2s;
+	box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+	color: var(--text-normal);
+	
+}
+
+.gamify-inventory-item:hover .gamify-item-tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Add a small arrow pointing down */
+.gamify-item-tooltip:after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #333 transparent transparent transparent;
+}
+
+.gamify-item-description {
+    font-size: 0.9em;
+    margin-bottom: 6px;
+\
+    flex-grow: 1;
+}
+.gamify-item-effects {
+    border-top: 1px solid var(--background-modifier-border);
+    padding-top: 6px;
+}
+
+.gamify-item-effect {
+    display: block;
+    font-size: 0.75em;
+    color: var(--text-accent);
+    padding: 2px 0;
+}
+
+/* Collapsible inventory styling */
+.gamify-section-header {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    border-radius: 4px;
+	text-align: center;
+	justify-content: center;	
+	
+}
+
+.gamify-section-header:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.gamify-collapse-icon {
+    margin-right: 8px;
+    font-size: 0.8em;
+}
+
+.gamify-inventory-content.collapsed {
+    display: none;
+}
+
+.gamify-inventory-item.clickable {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.gamify-inventory-item.clickable:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+
+/* Item cost display */
+.gamify-item-cost {
+    display: block;
+    font-size: 0.8em;
+    opacity: 0.8;
+    margin-top: 2px;
+}
+
+/* Enhanced inventory grid */
+.gamify-inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    padding: 10px 0;
+    margin-top: 10px;	
+}
+
+.gamify-inventory-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Light Mode - Softer Colors */
+.gamify-inventory-item.common-item {
+    background-color: rgba(230, 230, 230, 0.2); /* Very light gray */
+    border: 1px solid rgba(200, 200, 200, 0.5);
+}
+
+.gamify-inventory-item.rare-item {
+    background-color: rgba(220, 245, 220, 0.15); /* Light pastel green */
+    border: 1px solid rgba(170, 220, 170, 0.5);
+    color: rgba(90, 160, 90, 0.7);
+}
+
+.gamify-inventory-item.unique-item {
+    background-color: rgba(210, 235, 255, 0.6); /* Light sky blue */
+    border: 1px solid rgba(150, 200, 240, 0.5);
+    color: rgba(70, 130, 190, 0.7);
+}
+
+.gamify-inventory-item.legendary-item {
+    background-color: rgba(255, 245, 190, 0.15); /* Light golden hue */
+    border: 1px solid rgba(240, 215, 120, 0.5);
+    color: rgba(200, 160, 50, 0.8); /* Gold text */
+    box-shadow: 0 0 10px rgba(255, 223, 120, 0.5);
+    animation: pulseGlow 2s infinite alternate;
+}
+
+/* Dark Mode - Softer Colors */
+.theme-dark .gamify-inventory-item.common-item {
+    background-color: rgba(78, 78, 78, 0.5); /* Muted light gray */
+    border: 1px solid rgba(110, 110, 110, 0.6);
+}
+
+.theme-dark .gamify-inventory-item.rare-item {
+    background-color: rgba(60, 120, 70, 0.25); /* Soft green */
+    border: 1px solid rgba(90, 160, 90, 0.4);
+    color: rgba(190, 235, 190, 0.7);
+}
+
+.theme-dark .gamify-inventory-item.unique-item {
+    background-color: rgba(40, 100, 180, 0.25); /* Soft blue */
+    border: 1px solid rgba(90, 150, 210, 0.4);
+    color: rgba(180, 220, 250, 0.7);
+}
+
+.theme-dark .gamify-inventory-item.legendary-item {
+    background-color: rgba(150, 120, 50, 0.25); /* Soft gold */
+    border: 1px solid rgba(220, 180, 90, 0.4);
+    color: rgba(255, 220, 140, 0.8); /* Bright gold */
+    box-shadow: 0 0 10px rgba(255, 223, 120, 0.5);
+    animation: pulseGlow 2s infinite alternate;
+}
+
+/* Pulsing Glow Animation */
+@keyframes pulseGlow {
+    0% {
+        box-shadow: 0 0 10px rgba(255, 223, 120, 0.5);
+    }
+    100% {
+        box-shadow: 0 0 20px rgba(255, 230, 150, 0.8);
+    }
+}
+
+.achievement-item {
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+.unlocked {
+    background: var(--background-modifier-hover);
+    border-left: 4px solid #4caf50;
+}
+.locked {
+    background: var(--background-secondary);
+    border-left: 4px solid #bbb;
+    opacity: 0.5;
+}
+
+.gamify-achievements-section {
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--background-secondary);
+    box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.gamify-section-heading {
+    font-size: 1.5em;
+    font-weight: bold;
+	margin-top: 10px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.gamify-achievements-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.gamify-achievement-item {
+    padding: 6px;
+    border-radius: 4px;
+    background: var(--background-modifier-hover);
+    border-left: 4px solid #FFD700;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: relative;
+}
+
+.gamify-achievement-item:hover {
+    transform: scale(1.02);
+    box-shadow: 0px 4px 12px rgba(255, 215, 0, 0.4);
+}
+
+.gamify-achievement-header {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.gamify-achievement-name {
+    font-size: 1em;
+    font-weight: bold;
+}
+
+.gamify-achievement-tooltip {
+    width: 100%;
+    position: absolute;
+    bottom: 0%;
+    left: 0;
+    background-color: var(--background-primary);
+    color: var(--text-accent);
+    border: 1px solid var(--background-modifier-border);
+    padding: 6px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    transition: opacity 0.2s;
+    text-align: center;
+    z-index: 10;
+    font-size: 0.9em;
+    color: var(--text-muted);	
+}
+
+.gamify-achievement-item:hover .gamify-achievement-tooltip {
+    opacity: 1;
+}
+
+
+/* Subtle Glowing Effect for New Achievements */
+.gamify-glow {
+    animation: glowEffect 1.5s infinite alternate;
+}
+
+@keyframes glowEffect {
+    from {
+        box-shadow: 0px 0px 5px rgba(255, 215, 0, 0.3);
+    }
+    to {
+        box-shadow: 0px 0px 8px rgba(255, 215, 0, 0.6);
+    }
+}
+
