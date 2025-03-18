@@ -1,11 +1,11 @@
 {
   "id": "VaultQuestDev",
   "name": "VaultQuestDev",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "minAppVersion": "0.12.0",
   "description": "Gamify your note-taking experience",
   "author": "UnseenScholar",
   "authorUrl": "https://github.com/unseensholar/VaultQuest",
-  "isDesktopOnly": false,
+  "isDesktopOnly": true,
   "css": ["styles.css"]
 }
