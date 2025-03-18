@@ -13,7 +13,7 @@ Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-
 ---
 
 ## Changelog
-### v0.4.0
+### !!! MAJOR RELEASE v0.4.0!!!
 #### UI & UX Enhancements
 - Redesigned Progress Window in plugin settings.
 - Redesigned Stats Window for better readability.
