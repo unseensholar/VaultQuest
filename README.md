@@ -41,6 +41,17 @@ Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-
 - Fixed data saving bug that occasionally caused resets (user feedback required).
 - Temporarily disabled item usage from Inventory Tab (pending refinement).
 
+  ## Planned Updates
+- [x] **Achievements & Rewards**
+- [ ] **More Skill Categories**
+- [ ] **Activities and Quests**
+- [x] **Item Shop**
+- [x] **Theme Engine**
+- [ ] **Notification Sounds**
+- [x] **Level Up System Improvement**
+- [x] **Status Indicators**
+- [x]  **LLM Interactions**
+
 ### v0.3.0 - Major Update
 
 #### New Features
