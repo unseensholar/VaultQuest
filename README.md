@@ -51,7 +51,7 @@ Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-
 - [x] **Level Up System Improvement**
 - [x] **Status Indicators**
 - [x]  **LLM Interactions**
----
+
 ### v0.3.0 - Major Update
 
 #### New Features
