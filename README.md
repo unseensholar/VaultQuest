@@ -26,7 +26,8 @@ Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-
 #### New Features
 - Unlockable Theme Switcher added with new themes available in the store.
 - Inventory Tab added to showcase owned items.
-- Achievements System implemented with default and custom achievements. Instructions will be provided.
+- Achievements System implemented with default and custom achievements. (***Populated Achievements List:*** [Achievements.json](https://github.com/user-attachments/files/19324245/Achievements.json))
+- Streaks for Task Completion added to track consecutive tasks completed, with rewards for streak milestones.
 - Titles added to the Item Store to enhance customization.
 - Custom Store Items introduced for personalized game elements.
 - Level-Up Rewards updated for better progression balance.
