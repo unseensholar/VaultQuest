@@ -1,0 +1,34 @@
+{
+  "name": "vaultquest",
+  "version": "0.5.2",
+  "description": "Gamify your note-taking experience in Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "gamification",
+    "productivity"
+  ],
+  "author": "UnseenScholar",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^16.11.6",
+    "@typescript-eslint/eslint-plugin": "5.29.0",
+    "@typescript-eslint/parser": "5.29.0",
+    "builtin-modules": "3.3.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "latest",
+    "tslib": "2.4.0",
+    "typescript": "4.7.4"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "glob": "^11.0.1",
+    "rimraf": "^6.0.1"
+  }
+}
