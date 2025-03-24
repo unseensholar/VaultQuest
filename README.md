@@ -13,6 +13,48 @@ Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-
 ---
 
 ## Changelog
+### v0.5.2 - Major Enhancements & UI Overhaul
+
+#### Code Improvements & Refactoring  
+- Replaced `innerHTML` manipulations with safer **DOM API methods**.  
+- Reworked **active view handling** by using `getActiveViewOfType` instead of direct `workspace.activeLeaf` access.  
+- Switched to **Vault API** over the Adapter API for better performance.  
+- Modularized features for improved **code organization & maintainability**.  
+- Major UI elements now styled with **external CSS** for better maintainability.  
+- Updated code to align with **Obsidian community guidelines**.  
+
+#### Custom Tags & Skill System  
+- Updated the **custom tags** feature. It is now accessible by purchasing the corresponding item from the Item store.
+  - Tags cost **10 × multiplier points** (up to a **10× max multiplier**).  
+- Fixed **skill leveling bug** and improved logic.  
+
+#### UI/UX Enhancements  
+- **Stat Menu Overhaul**: More detailed stat displays.  
+- **Ribbon Button** added for quick access to plugin settings.  
+- **Achievements Section**:  
+  - Moved to an **independent tab view** with improved visualization.  
+  - Added a command and ribbon button for quick access.  
+- **Task Storage Viewer**: Now displayed in a **tab instead of a window** for a smoother experience.  
+- **Improved Inventory System**:  
+  - Enhanced visuals.  
+  - Enabled **item usage directly from the Inventory tab**.  
+
+#### New Features & Settings  
+- **Notification Log**: Keep track of important updates.  
+- **Task System Enhancements**:  
+  - Implemented **point deduction for unchecked tasks**.  
+  - Removed redundant log notifications.
+- **More LLM Inference Settings**:  
+  - Added **temperature** option.  
+  - Added **max response length** option (currently disabled).  
+  - Added text streaming option (currently disabled).  
+- **Data Persistence**: Added a feature to **save plugin data** if the Obsidian app is force-closed (testing required).  
+- **Toggle for Ribbon Buttons** in settings for more customization.  
+
+#### Achievements System Overhaul  
+- Achievements now stored in an **"Achievements" folder**.  
+- Any JSON file in the correct format is **automatically added** to the achievements list.  
+
 ### !!! MAJOR RELEASE v0.4.0!!!
 #### UI & UX Enhancements
 - Redesigned Progress Window in plugin settings.
