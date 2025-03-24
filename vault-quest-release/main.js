@@ -27,13 +27,19 @@ __export(main_exports, {
   default: () => GamifyPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian7 = require("obsidian");
+var import_obsidian15 = require("obsidian");
 
-// services.ts
+// core/CoreServices.ts
+var import_obsidian3 = require("obsidian");
+
+// features/StatCardService.ts
+var import_obsidian2 = require("obsidian");
+
+// features/themeService.ts
 var import_obsidian = require("obsidian");
 var ThemeService = class {
   constructor(plugin) {
-    this.currentThemeId = "gamesystem";
+    this.currentThemeId = "gamesystem_theme";
     this.themes = {
       demonic: {
         id: "demonic_theme",
@@ -325,13 +331,13 @@ var ThemeService = class {
       }
     };
     this.plugin = plugin;
-    this.currentThemeId = this.plugin.settings.themeId || "gamesystem";
+    this.currentThemeId = this.plugin.settings.themeId || "gamesystem_theme";
   }
   getCurrentTheme() {
-    return this.themes[this.currentThemeId] || this.themes.gamesystem;
+    return this.themes[this.currentThemeId] || this.themes.gamesystem_theme;
   }
   getTheme(themeId) {
-    return this.themes[themeId] || this.themes.gamesystem;
+    return this.themes[themeId] || this.themes.gamesystem_theme;
   }
   switchTheme(themeId) {
     if (this.themes[themeId]) {
@@ -436,7 +442,7 @@ var ThemeService = class {
         {
           "role": "user",
           "content": `Create a theme with the concept: ${themeInstruction}.
-					}`
+                    }`
         }
       ];
       const response = await fetch(`${this.plugin.settings.apiUrl}/v1/chat/completions`, {
@@ -448,7 +454,7 @@ var ThemeService = class {
         body: JSON.stringify({
           model: this.plugin.settings.selectedLLMModel,
           messages,
-          temperature: 0.9,
+          temperature: this.plugin.settings.LLM_param.temp,
           tools: [{ "type": "function", "function": functions[0] }],
           tool_choice: { "type": "function", "function": { "name": "create_theme" } }
         })
@@ -487,24 +493,18 @@ var ThemeSelectionModal = class extends import_obsidian.Modal {
     var _a;
     const { contentEl } = this;
     contentEl.empty();
+    contentEl.addClass("theme-service-modal-container");
     contentEl.createEl("h2", { text: "Choose Theme" });
-    const themesContainer = contentEl.createDiv({ cls: "theme-selection-container" });
-    themesContainer.style.display = "flex";
-    themesContainer.style.flexWrap = "wrap";
-    themesContainer.style.gap = "10px";
+    const themesContainer = contentEl.createDiv({ cls: "theme-service-themes-container" });
     const createThemeOption = (themeId, themeName) => {
-      const label = themesContainer.createEl("label", { cls: "theme-option" });
-      label.style.display = "flex";
-      label.style.alignItems = "center";
-      label.style.cursor = "pointer";
-      label.style.padding = "5px 10px";
-      label.style.border = "1px solid var(--interactive-accent)";
-      label.style.borderRadius = "6px";
-      const input = label.createEl("input", { type: "radio", attr: { name: "theme", value: themeId } });
-      input.style.marginRight = "8px";
-      if (this.themeService.getCurrentTheme().id === themeId) {
+      const label = themesContainer.createEl("label", { cls: "theme-service-theme-option" });
+      const input = label.createEl("input", {
+        type: "radio",
+        attr: { name: "theme", value: themeId }
+      });
+      if (this.themeService.getCurrentTheme().id.replace("_theme", "") === themeId) {
         input.checked = true;
-        label.style.backgroundColor = "var(--background-modifier-hover)";
+        label.addClass("selected");
       }
       input.onclick = () => {
         this.themeService.switchTheme(themeId);
@@ -524,14 +524,14 @@ var ThemeSelectionModal = class extends import_obsidian.Modal {
       });
     }
     createThemeOption("custom", "Custom Theme");
-    const customContainer = contentEl.createDiv({ cls: "custom-theme-container" });
+    const customContainer = contentEl.createDiv({ cls: "theme-service-custom-container" });
     customContainer.createEl("h3", { text: "Create Custom Theme" });
     customContainer.createEl("p", {
       text: "Generate a new theme using the LLM. This will cost 500 points."
     });
     const customInput = new import_obsidian.TextComponent(customContainer).setPlaceholder('e.g., "Space sci-fi theme with starship terminology"');
-    const inputEl = customInput.inputEl;
-    inputEl.style.width = "100%";
+    customInput.inputEl.addClass("theme-service-custom-input");
+    const buttonsContainer = contentEl.createDiv({ cls: "theme-service-buttons-container" });
     new import_obsidian.ButtonComponent(customContainer).setButtonText("Generate Custom Theme").onClick(async () => {
       if (!customInput.getValue()) {
         new import_obsidian.Notice("Please enter a theme concept");
@@ -556,7 +556,7 @@ var ThemeSelectionModal = class extends import_obsidian.Modal {
       }
       await this.plugin.saveStatCardData();
     });
-    const backButton = new import_obsidian.ButtonComponent(contentEl).setButtonText("Back").onClick(() => {
+    const backButton = new import_obsidian.ButtonComponent(buttonsContainer).setButtonText("Back").onClick(() => {
       this.close();
       new StatCardModal(this.app, this.plugin).open();
     });
@@ -566,6 +566,8 @@ var ThemeSelectionModal = class extends import_obsidian.Modal {
     contentEl.empty();
   }
 };
+
+// features/StatCardService.ts
 var StatCardService = class {
   constructor(plugin) {
     this.statusBarItem = null;
@@ -589,19 +591,283 @@ var StatCardService = class {
     this.updateStatusBar();
   }
 };
+var StatCardModal = class _StatCardModal extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("gamify-stat-card-modal");
+    const theme = this.plugin.themeService.getCurrentTheme();
+    this.renderHeader(contentEl, theme);
+    this.renderCoreStats(contentEl, theme);
+    this.renderSkills(contentEl, theme);
+    this.renderTitles(contentEl);
+    this.renderInventory(contentEl);
+    this.renderActiveEffects(contentEl, theme);
+    this.renderFamiliar(contentEl);
+    this.renderSubStats(contentEl, theme);
+    this.renderAchievements(contentEl);
+  }
+  renderHeader(contentEl, theme) {
+    var _a;
+    const themeButton = new import_obsidian2.ButtonComponent(contentEl).setButtonText("Change Theme").setClass("theme-selector-button").onClick(() => {
+      this.close();
+      new ThemeSelectionModal(this.app, this.plugin, this.plugin.themeService).open();
+    });
+    if (!((_a = this.plugin.statCardData.items) == null ? void 0 : _a.some((item) => item.id === "theme_toggler"))) {
+      themeButton.setDisabled(true);
+    }
+    contentEl.createEl("h2", { text: theme.uiElements.grimoire, cls: "gamify-modal-title" });
+  }
+  renderCoreStats(contentEl, theme) {
+    const statsContainer = contentEl.createDiv({ cls: "gamify-stats-container" });
+    const levelTitle = this.plugin.themeService.getLevelTitle(this.plugin.statCardData.level);
+    statsContainer.createEl("h3", {
+      text: `Level ${this.plugin.statCardData.level} ${levelTitle}`,
+      cls: "gamify-stats-heading"
+    });
+    const xpBar = statsContainer.createDiv({ cls: "gamify-xp-bar" });
+    const fillPercentage = Math.min(100, this.plugin.statCardData.xp / this.plugin.statCardData.nextLevelXp * 100);
+    const xpBarFill = xpBar.createDiv({ cls: "gamify-xp-bar-fill" });
+    xpBarFill.style.width = `${fillPercentage}%`;
+    const statEl = statsContainer.createEl("div", { cls: "gamify-stat-item" });
+    statEl.createEl("strong", { text: `${theme.uiElements.xp}: ` });
+    statEl.appendText(`${Math.floor(this.plugin.statCardData.xp)}/${this.plugin.statCardData.nextLevelXp}`);
+    const summaryContainer = statsContainer.createDiv({ cls: "gamify-stats-grid" });
+    const summaryEntries = [
+      { label: `${theme.uiElements.tasksCompleted}`, value: `${this.plugin.statCardData.stats.tasksCompleted || 0}` },
+      { label: `${theme.uiElements.points}`, value: `${this.plugin.statCardData.points || 0}` }
+    ];
+    summaryEntries.forEach((stat) => {
+      const statEl2 = summaryContainer.createDiv({ cls: "gamify-stat-card" });
+      statEl2.createDiv({ cls: "gamify-stat-label", text: stat.label });
+      statEl2.createDiv({ cls: "gamify-stat-value", text: stat.value });
+    });
+  }
+  renderSubStats(contentEl, theme) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    const statsContainer = contentEl.createDiv({ cls: "gamify-stats-container" });
+    statsContainer.createEl("h3", { text: "Sub Stats", cls: "gamify-section-heading" });
+    const statsGridContainer = statsContainer.createDiv({ cls: "gamify-stats-grid" });
+    const mainStats = [
+      { label: "File Count", value: `${((_b = (_a = this.plugin.statCardData) == null ? void 0 : _a.stats) == null ? void 0 : _b.lastFileCount) || 0}` },
+      { label: "Folder Count", value: `${((_d = (_c = this.plugin.statCardData) == null ? void 0 : _c.stats) == null ? void 0 : _d.lastFolderCount) || 0}` },
+      { label: "Characters Typed", value: ((_f = (_e = this.plugin.statCardData) == null ? void 0 : _e.writingStats) == null ? void 0 : _f.totalCharactersTyped) || 0 },
+      { label: "Highest Difficulty", value: ((_h = (_g = this.plugin.statCardData) == null ? void 0 : _g.stats) == null ? void 0 : _h.highestDifficulty) || 0 },
+      { label: `Total ${theme.uiElements.points} Earned`, value: `${this.plugin.statCardData.stats.totalPointsEarned || 0}` },
+      { label: "Total Items Purchased", value: ((_j = (_i = this.plugin.statCardData) == null ? void 0 : _i.stats) == null ? void 0 : _j.itemsPurchased) || 0 }
+    ];
+    mainStats.forEach((stat) => {
+      const statCard = statsGridContainer.createDiv({ cls: "gamify-stat-card" });
+      statCard.createDiv({ cls: "gamify-stat-label", text: `${stat.label}` });
+      statCard.createDiv({ cls: "gamify-stat-value", text: `${stat.value}` });
+    });
+    const streaksContainer = statsContainer.createDiv({ cls: "gamify-streaks-grid" });
+    const streakStats = [
+      { label: "Current Streak", value: ((_l = (_k = this.plugin.statCardData) == null ? void 0 : _k.streaks) == null ? void 0 : _l.currentStreak) || 0 },
+      { label: "Longest Streak", value: ((_n = (_m = this.plugin.statCardData) == null ? void 0 : _m.streaks) == null ? void 0 : _n.longestStreak) || 0 }
+    ];
+    streakStats.forEach((streak) => {
+      const streakCard = streaksContainer.createDiv({ cls: "gamify-stat-card streak-card" });
+      streakCard.createDiv({ cls: "gamify-stat-label", text: `${streak.label}` });
+      streakCard.createDiv({ cls: "gamify-stat-value", text: `${streak.value}` });
+    });
+  }
+  renderSkills(contentEl, theme) {
+    const { skills } = this.plugin.statCardData;
+    if (!skills || skills.length === 0) return;
+    const skillsSection = contentEl.createDiv({ cls: "gamify-skills-section" });
+    skillsSection.createEl("h3", { text: theme.uiElements.skills, cls: "gamify-section-heading" });
+    const skillsContainer = skillsSection.createDiv({ cls: "gamify-skills-container" });
+    skills.forEach((skill) => {
+      const skillBlock = skillsContainer.createDiv({ cls: "gamify-skill-block" });
+      const skillTitle = skillBlock.createEl("h4", { text: skill.name, cls: "gamify-skill-title" });
+      const skillLevel = skillBlock.createEl("p", { text: `${skill.level}`, cls: "gamify-skill-level" });
+    });
+  }
+  renderTitles(contentEl) {
+    if (!this.plugin.statCardData.titles || this.plugin.statCardData.titles.length === 0) return;
+    const titlesSection = contentEl.createDiv({ cls: "gamify-titles-section" });
+    titlesSection.createEl("h3", { text: "Titles", cls: "gamify-section-heading" });
+    const titlesList = titlesSection.createDiv({ cls: "gamify-titles-grid" });
+    for (const title of this.plugin.statCardData.titles) {
+      const titleItem = titlesList.createEl("div", { cls: "gamify-title-item gamify-glow" });
+      titleItem.createEl("span", { text: `\u3010${title.name}\u3011`, cls: "gamify-title-name" });
+      if (title.effect && title.effect.length > 0) {
+        const effectsList = titleItem.createEl("div", { cls: "gamify-title-tooltip" });
+        for (const effect of title.effect) {
+          effectsList.createEl("span", { text: effect, cls: "gamify-title-effect" });
+        }
+      }
+    }
+  }
+  renderInventory(contentEl) {
+    if (!this.plugin.statCardData.items || this.plugin.statCardData.items.length === 0) return;
+    const inventorySection = contentEl.createDiv({ cls: "gamify-inventory-section" });
+    const inventoryHeader = inventorySection.createDiv({ cls: "gamify-section-header" });
+    inventoryHeader.createEl("h3", { text: "Items", cls: "gamify-section-heading" });
+    const inventoryContent = inventorySection.createDiv({ cls: "gamify-inventory-content" });
+    const inventoryGrid = inventoryContent.createDiv({ cls: "gamify-inventory-grid" });
+    for (const item of this.plugin.statCardData.items) {
+      const rarityClass = this.getItemRarityClass(item.cost);
+      const itemEl = inventoryGrid.createEl("div", {
+        cls: `gamify-inventory-item clickable ${rarityClass}`,
+        attr: { "data-item-id": item.id }
+      });
+      itemEl.createEl("span", { text: item.name, cls: "gamify-item-name" });
+      const tooltipContent = itemEl.createEl("div", {
+        cls: "gamify-item-tooltip",
+        attr: { "aria-label": "Item details" }
+      });
+      tooltipContent.createEl("div", { text: item.description, cls: "gamify-item-description" });
+      if (item.effect && item.effect.length > 0) {
+        const effectsList = tooltipContent.createEl("div", { cls: "gamify-item-effects" });
+        for (const effect of Array.isArray(item.effect) ? item.effect : [item.effect]) {
+          effectsList.createEl("span", { text: effect, cls: "gamify-item-effect" });
+        }
+      }
+      itemEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleItemClick(item);
+      });
+    }
+  }
+  getItemRarityClass(itemCost) {
+    if (!itemCost) return "common-item";
+    const cost = typeof itemCost === "string" ? parseInt(itemCost) : itemCost;
+    if (cost >= 500) return "legendary-item";
+    if (cost >= 200) return "unique-item";
+    if (cost >= 50) return "rare-item";
+    return "common-item";
+  }
+  renderActiveEffects(contentEl, theme) {
+    if (!this.plugin.statCardData.activeEffects || Object.keys(this.plugin.statCardData.activeEffects).length === 0) return;
+    const effectsSection = contentEl.createDiv({ cls: "gamify-active-effects" });
+    effectsSection.createEl("h4", { text: "Active Effects" });
+    const now = Date.now();
+    for (const [key, effect] of Object.entries(this.plugin.statCardData.activeEffects)) {
+      if (effect.expiresAt && effect.expiresAt > now) {
+        let timeLeftMs = effect.expiresAt - now;
+        let timeLeftStr = "";
+        const seconds = Math.floor(timeLeftMs / 1e3 % 60);
+        const minutes = Math.floor(timeLeftMs / (1e3 * 60) % 60);
+        const hours = Math.floor(timeLeftMs / (1e3 * 60 * 60) % 24);
+        const days = Math.floor(timeLeftMs / (1e3 * 60 * 60 * 24) % 365);
+        const years = Math.floor(timeLeftMs / (1e3 * 60 * 60 * 24 * 365));
+        if (years > 0) {
+          timeLeftStr = `${years} year${years > 1 ? "s" : ""}`;
+          if (days > 0) timeLeftStr += `, ${days} day${days > 1 ? "s" : ""}`;
+        } else if (days > 0) {
+          timeLeftStr = `${days} day${days > 1 ? "s" : ""}`;
+          if (hours > 0) timeLeftStr += `, ${hours} hour${hours > 1 ? "s" : ""}`;
+        } else if (hours > 0) {
+          timeLeftStr = `${hours} hour${hours > 1 ? "s" : ""}`;
+          if (minutes > 0) timeLeftStr += `, ${minutes} min${minutes > 1 ? "s" : ""}`;
+        } else if (minutes > 0) {
+          timeLeftStr = `${minutes} min${minutes > 1 ? "s" : ""}`;
+          if (seconds > 0) timeLeftStr += `, ${seconds} sec${seconds > 1 ? "s" : ""}`;
+        } else {
+          timeLeftStr = `${seconds} sec${seconds > 1 ? "s" : ""}`;
+        }
+        const effectEl = effectsSection.createDiv({ cls: "gamify-effect-item" });
+        let effectName = "Unknown Effect";
+        let effectValue = "";
+        switch (key) {
+          case "storeDiscount":
+            effectName = `Store Discount`;
+            effectValue = `${effect.value * 100}%`;
+            break;
+          case "xpMultiplier":
+            effectName = `${theme.uiElements.xp} Multiplier`;
+            effectValue = `${effect.value}x`;
+            break;
+        }
+        effectEl.createEl("span", { text: `${effectName}: ${effectValue}` });
+        effectEl.createEl("span", { text: ` (${timeLeftStr} remaining)` });
+      }
+    }
+  }
+  renderFamiliar(contentEl) {
+    if (!this.plugin.statCardData.hasFamiliar) return;
+    const familiarSection = contentEl.createDiv({ cls: "gamify-familiar-section" });
+    familiarSection.createEl("h4", { text: "Familiar" });
+    familiarSection.createEl("p", {
+      text: "Your familiar is providing daily benefits."
+    });
+  }
+  renderAchievements(contentEl) {
+    if (!this.plugin.statCardData.achievements || this.plugin.statCardData.achievements.length === 0) return;
+    const achievementsSection = contentEl.createDiv({ cls: "gamify-achievements-section" });
+    achievementsSection.createEl("h3", { text: "Achievements", cls: "gamify-section-heading" });
+    const achievementsList = achievementsSection.createEl("ul", { cls: "gamify-achievements-list" });
+    for (const achievement of this.plugin.statCardData.achievements) {
+      const achievementItem = achievementsList.createEl("li", { cls: "gamify-achievement-item" });
+      const iconAndName = achievementItem.createEl("div", { cls: "gamify-achievement-header" });
+      iconAndName.createEl("strong", { text: achievement.name, cls: "gamify-achievement-name" });
+      const tooltip = achievementItem.createEl("span", { text: achievement.description, cls: "gamify-achievement-tooltip" });
+      achievementItem.addEventListener("mouseenter", () => {
+        tooltip.addClass("gamify-tooltip-visible");
+      });
+      achievementItem.addEventListener("mouseleave", () => {
+        tooltip.removeClass("gamify-tooltip-visible");
+      });
+      achievementItem.classList.add("gamify-glow");
+    }
+  }
+  handleItemClick(item) {
+    if (item.id === "infinite_inventory") {
+      this.plugin.activateInventoryTab();
+      return;
+    }
+    if (item.id === "mysterious_tablet") {
+      new RedeemTaskModal(this.plugin.app, this.plugin).open();
+      return;
+    }
+    if (item.effect && item.effect.includes("Set theme.")) {
+      const themeId = item.id.replace("_theme", "");
+      this.plugin.themeService.switchTheme(themeId);
+      this.close();
+      new _StatCardModal(this.app, this.plugin).open();
+      return;
+    }
+    if (item.effect) {
+      try {
+        const effectFunction = this.createEffectFunction(typeof item.effect === "string" ? item.effect : "");
+        effectFunction(this.plugin);
+        new import_obsidian2.Notice(`Activated: ${item.name}`);
+      } catch (error) {
+        console.error("Error executing item effect:", error);
+        new import_obsidian2.Notice("Error activating item effect.");
+      }
+    }
+  }
+  createEffectFunction(effect) {
+    try {
+      return new Function("plugin", effect);
+    } catch (error) {
+      console.error("Invalid effect code in JSON:", error);
+      return () => new import_obsidian2.Notice("Error executing item effect.");
+    }
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+
+// core/CoreServices.ts
 var LLMTaskService = class {
   constructor(plugin) {
     this.keyPressCount = 0;
-    this.lastFileCount = 0;
-    this.lastFolderCount = 0;
     this.intervalId = null;
     this.plugin = plugin;
     this.keyboardListener = this.handleKeyPress.bind(this);
     document.addEventListener("keydown", this.keyboardListener);
     this.updateFileFolderCounts();
     this.intervalId = window.setInterval(() => this.updateFileFolderCounts(), 6e4 * 5);
-    this.lastFileCount = this.plugin.statCardData.stats.lastFileCount || 0;
-    this.lastFolderCount = this.plugin.statCardData.stats.lastFolderCount || 0;
   }
   handleKeyPress(e) {
     if (e.key.length === 1 || e.key === "Backspace" || e.key === "Delete" || e.key === "Enter") {
@@ -630,15 +896,15 @@ var LLMTaskService = class {
         }
       });
       const folderCount = folders.size;
-      this.plugin.statCardData.stats.lastFileCount = fileCount;
-      this.plugin.statCardData.stats.lastFolderCount = folderCount;
-      if (fileCount !== this.lastFileCount) {
+      const previousFileCount = this.plugin.statCardData.stats.lastFileCount || 0;
+      const previousFolderCount = this.plugin.statCardData.stats.lastFolderCount || 0;
+      if (fileCount !== previousFileCount) {
+        this.plugin.statCardData.stats.lastFileCount = fileCount;
         this.updateResearchSkill(fileCount);
-        this.lastFileCount = fileCount;
       }
-      if (folderCount !== this.lastFolderCount) {
+      if (folderCount !== previousFolderCount) {
+        this.plugin.statCardData.stats.lastFolderCount = folderCount;
         this.updateOrganizationSkill(folderCount);
-        this.lastFolderCount = folderCount;
       }
     } catch (error) {
       console.error("Error updating file/folder counts:", error);
@@ -651,18 +917,55 @@ var LLMTaskService = class {
       this.updateSkill(skill, xpGain);
     }
   }
+  getRequiredCountForLevel(level, baseCount, incrementFactor) {
+    let total = 0;
+    for (let i = 1; i <= level; i++) {
+      total += Math.floor(baseCount + (i - 1) * incrementFactor);
+    }
+    return total;
+  }
+  getLevelForCount(count, baseCount, incrementFactor) {
+    let level = 0;
+    let totalRequired = 0;
+    let prevTotalRequired = 0;
+    while (true) {
+      level++;
+      prevTotalRequired = totalRequired;
+      totalRequired += Math.floor(baseCount + (level - 1) * incrementFactor);
+      if (totalRequired > count) {
+        level--;
+        const nextLevelCost = Math.floor(baseCount + level * incrementFactor);
+        const remainingCount = count - prevTotalRequired;
+        const progress = remainingCount / nextLevelCost * 100;
+        return { level, progress };
+      }
+      if (totalRequired === count) {
+        return { level, progress: 0 };
+      }
+    }
+  }
   updateResearchSkill(fileCount) {
     const skill = this.plugin.statCardData.skills.find((s) => s.id === "research");
     if (skill) {
-      const xpGain = Math.floor(fileCount / 5);
-      this.updateSkill(skill, xpGain);
+      const result = this.getLevelForCount(fileCount, 5, 10);
+      this.setSkillLevel(skill, result.level, result.progress);
     }
   }
   updateOrganizationSkill(folderCount) {
     const skill = this.plugin.statCardData.skills.find((s) => s.id === "organization");
     if (skill) {
-      const xpGain = Math.floor(folderCount / 5);
-      this.updateSkill(skill, xpGain);
+      const result = this.getLevelForCount(folderCount, 3, 4);
+      this.setSkillLevel(skill, result.level, result.progress);
+    }
+  }
+  setSkillLevel(skill, newLevel, xpPercentage) {
+    const oldLevel = skill.level;
+    skill.level = newLevel;
+    skill.xp = Math.floor(xpPercentage);
+    if (newLevel > oldLevel) {
+      const pointsGained = (newLevel - oldLevel) * 2;
+      this.plugin.statCardData.points += pointsGained;
+      new import_obsidian3.Notice(`Your ${skill.name} skill has increased to level ${skill.level}!`);
     }
   }
   updateSkill(skill, xpAmount) {
@@ -677,11 +980,11 @@ var LLMTaskService = class {
     }
     skill.xp += xpAmount;
     const nextLevel = skill.level + 1;
-    const xpForNextLevel = nextLevel * 25;
+    const xpForNextLevel = Math.floor(100 + 25 * nextLevel + Math.pow(nextLevel, 2) * 2);
     if (skill.xp >= xpForNextLevel) {
       skill.level = nextLevel;
       skill.xp = 0;
-      new import_obsidian.Notice(`Your ${skill.name} skill has increased to level ${skill.level}!`);
+      new import_obsidian3.Notice(`Your ${skill.name} skill has increased to level ${skill.level}!`);
       this.plugin.statCardData.points += nextLevel * 2;
     }
   }
@@ -692,7 +995,7 @@ var LLMTaskService = class {
         return this.generateTheme(instruction);
       }
       const pointsCost = await this.determineTaskCost(instruction);
-      new import_obsidian.Notice(`${pointsCost} points will be expended for the task.`);
+      new import_obsidian3.Notice(`${pointsCost} points will be expended for the task.`);
       if (this.plugin.statCardData.points < pointsCost) {
         throw new Error(`Not enough points. You need ${pointsCost} points to perform this action.`);
       }
@@ -869,7 +1172,7 @@ var LLMTaskService = class {
         body: JSON.stringify({
           model: this.plugin.settings.selectedLLMModel,
           messages,
-          temperature: 5,
+          temperature: 0.5,
           tools: [{ "type": "function", "function": functions[0] }],
           tool_choice: { "type": "function", "function": { "name": "determine_cost" } }
         }),
@@ -1087,10 +1390,10 @@ ${content}
 *the portal closes....*
 `;
       await this.plugin.app.vault.create(filename, fileContent);
-      new import_obsidian.Notice(`Task result saved to ${filename}`);
+      new import_obsidian3.Notice(`Task result saved to ${filename}`);
     } catch (error) {
       console.error("Error saving result to vault:", error);
-      new import_obsidian.Notice("Error saving task result to vault.");
+      new import_obsidian3.Notice("Error saving task result to vault.");
     }
   }
   destroy() {
@@ -1101,47 +1404,59 @@ ${content}
     }
   }
 };
-var RedeemTaskModal = class extends import_obsidian.Modal {
+var RedeemTaskModal = class extends import_obsidian3.Modal {
   constructor(app, plugin) {
     super(app);
     this.instruction = "";
     this.plugin = plugin;
   }
   onOpen() {
+    var _a;
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Beseech Unknown Powers" });
-    contentEl.createEl("p", {
-      text: `Points Available: ${this.plugin.statCardData.points}`
+    contentEl.addClass("redeem-task-modal");
+    const theme = this.plugin.themeService.getCurrentTheme();
+    const header = contentEl.createDiv({ cls: "redeem-header" });
+    header.createEl("h2", { text: "Beseech Unknown Powers" });
+    const pointsContainer = contentEl.createDiv({ cls: "points-display" });
+    const pointsValue = pointsContainer.createSpan({ cls: "points-value" });
+    pointsValue.setText(`${this.plugin.statCardData.points}`);
+    const pointsLabel = pointsContainer.createSpan({ cls: "points-label" });
+    pointsLabel.setText(` ${((_a = theme == null ? void 0 : theme.uiElements) == null ? void 0 : _a.points) || "Points"} Available`);
+    const inputSection = contentEl.createDiv({ cls: "input-section" });
+    inputSection.createEl("label", {
+      text: "What do you wish to request?",
+      cls: "input-label"
     });
-    contentEl.createEl("label", { text: "What do you wish to request?" });
-    const instructionInput = new import_obsidian.TextComponent(contentEl).setPlaceholder('e.g., "Write a tale of "').onChange((value) => {
+    const instructionInput = new import_obsidian3.TextComponent(inputSection).setPlaceholder("Enter your request here...").onChange((value) => {
       this.instruction = value;
     });
-    const inputEl = instructionInput.inputEl;
-    inputEl.style.width = "100%";
-    inputEl.style.height = "100px";
+    instructionInput.inputEl.classList.add("redeem-input");
+    instructionInput.inputEl.style.minHeight = "120px";
+    instructionInput.inputEl.style.width = "100%";
+    setTimeout(() => {
+      instructionInput.inputEl.focus();
+    }, 50);
     const buttonContainer = contentEl.createDiv({ cls: "redeem-buttons" });
-    new import_obsidian.ButtonComponent(buttonContainer).setButtonText("Dismiss").onClick(() => {
-      this.close();
-      new StatCardModal(this.app, this.plugin).open();
-    });
-    new import_obsidian.ButtonComponent(buttonContainer).setButtonText("Request").setCta().onClick(async () => {
+    const requestButton = new import_obsidian3.ButtonComponent(buttonContainer).setButtonText("Request").setCta().onClick(async () => {
+      var _a2;
       if (!this.instruction) {
-        new import_obsidian.Notice("You must specify your request.");
+        new import_obsidian3.Notice("You must specify your request.");
         return;
       }
       try {
         this.close();
-        new import_obsidian.Notice("Transmitting through the ether...");
+        const processingNotice = new import_obsidian3.Notice("Transmitting through the ether...", 0);
         const llmService = new LLMTaskService(this.plugin);
         const cost = await llmService.determineTaskCost(this.instruction);
         if (this.plugin.statCardData.points < cost) {
-          new import_obsidian.Notice(`Not enough points. You need ${cost} points to perform this action.`);
+          processingNotice.hide();
+          new import_obsidian3.Notice(`Not enough ${((_a2 = theme == null ? void 0 : theme.uiElements) == null ? void 0 : _a2.points) || "points"}. You need ${cost} to perform this action.`);
           new StatCardModal(this.app, this.plugin).open();
           return;
         }
         const result = await llmService.executeTask(this.instruction);
+        processingNotice.hide();
         if (this.plugin.statCardService) {
           this.plugin.statCardService.refreshUI();
         }
@@ -1149,9 +1464,17 @@ var RedeemTaskModal = class extends import_obsidian.Modal {
         resultModal.open();
       } catch (error) {
         console.error("Error executing task:", error);
-        new import_obsidian.Notice(`The request failed. ${error.message}`);
+        new import_obsidian3.Notice(`The request failed. ${error.message}`);
         new StatCardModal(this.app, this.plugin).open();
       }
+    });
+    instructionInput.inputEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        requestButton.buttonEl.click();
+      }
+    });
+    const dismissButton = new import_obsidian3.ButtonComponent(buttonContainer).setButtonText("Dismiss").onClick(() => {
+      this.close();
     });
   }
   onClose() {
@@ -1159,7 +1482,7 @@ var RedeemTaskModal = class extends import_obsidian.Modal {
     contentEl.empty();
   }
 };
-var TaskResultModal = class extends import_obsidian.Modal {
+var TaskResultModal = class extends import_obsidian3.Modal {
   constructor(app, plugin, result) {
     super(app);
     this.plugin = plugin;
@@ -1170,223 +1493,24 @@ var TaskResultModal = class extends import_obsidian.Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: "Response" });
     const resultContainer = contentEl.createDiv({ cls: "task-result-container" });
-    resultContainer.style.maxHeight = "400px";
-    resultContainer.style.overflow = "auto";
-    resultContainer.style.padding = "10px";
-    resultContainer.style.border = "1px solid var(--background-modifier-border)";
-    resultContainer.style.margin = "10px 0";
     const MarkdownIt = window.markdownit;
     if (MarkdownIt) {
       const md = new MarkdownIt();
-      resultContainer.innerHTML = md.render(this.result);
+      const renderedMarkdown = md.render(this.result);
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = renderedMarkdown;
+      while (tempDiv.firstChild) {
+        resultContainer.appendChild(tempDiv.firstChild);
+      }
     } else {
-      resultContainer.innerHTML = this.result.replace(/\n/g, "<br>");
+      this.result.split("\n").forEach((line) => {
+        const p = resultContainer.createEl("p", { text: line });
+      });
     }
     const buttonContainer = contentEl.createDiv({ cls: "task-result-buttons" });
-    new import_obsidian.ButtonComponent(buttonContainer).setButtonText("Return to Stat Card").onClick(() => {
+    new import_obsidian3.ButtonComponent(buttonContainer).setButtonText("Return").onClick(() => {
       this.close();
-      new StatCardModal(this.app, this.plugin).open();
     });
-  }
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
-  }
-};
-var StatCardModal = class _StatCardModal extends import_obsidian.Modal {
-  constructor(app, plugin) {
-    super(app);
-    this.plugin = plugin;
-  }
-  onOpen() {
-    var _a;
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass("gamify-stat-card-modal");
-    const theme = this.plugin.themeService.getCurrentTheme();
-    const themeButton = new import_obsidian.ButtonComponent(contentEl).setButtonText("Change Theme").setClass("theme-selector-button").onClick(() => {
-      this.close();
-      new ThemeSelectionModal(this.app, this.plugin, this.plugin.themeService).open();
-    });
-    if (!((_a = this.plugin.statCardData.items) == null ? void 0 : _a.some((item) => item.id === "theme_toggler"))) {
-      themeButton.setDisabled(true);
-    }
-    contentEl.createEl("h2", { text: theme.uiElements.grimoire, cls: "gamify-modal-title" });
-    const statsContainer = contentEl.createDiv({ cls: "gamify-stats-container" });
-    const levelTitle = this.plugin.themeService.getLevelTitle(this.plugin.statCardData.level);
-    statsContainer.createEl("h3", {
-      text: `Level ${this.plugin.statCardData.level} ${levelTitle}`,
-      cls: "gamify-stats-heading"
-    });
-    const xpBar = statsContainer.createDiv({ cls: "gamify-xp-bar" });
-    const fillPercentage = Math.min(100, this.plugin.statCardData.xp / this.plugin.statCardData.nextLevelXp * 100);
-    const xpBarFill = xpBar.createDiv({ cls: "gamify-xp-bar-fill" });
-    xpBarFill.style.width = `${fillPercentage}%`;
-    statsContainer.createEl("div", {
-      text: `${theme.uiElements.xp}: ${Math.floor(this.plugin.statCardData.xp)}/${this.plugin.statCardData.nextLevelXp}`,
-      cls: "gamify-stat-item"
-    });
-    statsContainer.createEl("div", {
-      text: `${theme.uiElements.points}: ${this.plugin.statCardData.points}`,
-      cls: "gamify-stat-item"
-    });
-    statsContainer.createEl("div", {
-      text: `${theme.uiElements.tasksCompleted}: ${this.plugin.statCardData.stats.tasksCompleted}`,
-      cls: "gamify-stat-item"
-    });
-    statsContainer.createEl("div", {
-      text: `Total ${theme.uiElements.points} Earned: ${this.plugin.statCardData.stats.totalPointsEarned}`,
-      cls: "gamify-stat-item"
-    });
-    const skillsSection = contentEl.createDiv({ cls: "gamify-skills-section" });
-    skillsSection.createEl("h3", { text: theme.uiElements.skills, cls: "gamify-section-heading" });
-    const skillsList = skillsSection.createEl("ul", { cls: "gamify-skills-list" });
-    for (const skill of this.plugin.statCardData.skills) {
-      skillsList.createEl("li", {
-        text: `${skill.name}: Level ${skill.level}`,
-        cls: "gamify-skill-item"
-      });
-    }
-    if (this.plugin.statCardData.titles && this.plugin.statCardData.titles.length > 0) {
-      const titlesSection = contentEl.createDiv({ cls: "gamify-titles-section" });
-      titlesSection.createEl("h3", { text: "Titles", cls: "gamify-section-heading" });
-      const titlesList = titlesSection.createDiv({ cls: "gamify-titles-grid" });
-      for (const title of this.plugin.statCardData.titles) {
-        const titleItem = titlesList.createEl("div", { cls: "gamify-title-item gamify-glow" });
-        titleItem.createEl("span", { text: `\u3010${title.name}\u3011`, cls: "gamify-title-name" });
-        if (title.effect && title.effect.length > 0) {
-          const effectsList = titleItem.createEl("div", { cls: "gamify-title-tooltip" });
-          for (const effect of title.effect) {
-            effectsList.createEl("span", { text: effect, cls: "gamify-title-effect" });
-          }
-        }
-      }
-    }
-    if (this.plugin.statCardData.items && this.plugin.statCardData.items.length > 0) {
-      let getItemRarityClass = function(itemCost) {
-        if (!itemCost) return "common-item";
-        const cost = parseInt(itemCost);
-        if (cost >= 500) return "legendary-item";
-        if (cost >= 200) return "unique-item";
-        if (cost >= 50) return "rare-item";
-        return "common-item";
-      };
-      const inventorySection = contentEl.createDiv({ cls: "gamify-inventory-section" });
-      const inventoryHeader = inventorySection.createDiv({ cls: "gamify-section-header" });
-      inventoryHeader.createEl("h3", { text: "Items", cls: "gamify-section-heading" });
-      const inventoryContent = inventorySection.createDiv({ cls: "gamify-inventory-content" });
-      const inventoryGrid = inventoryContent.createDiv({ cls: "gamify-inventory-grid" });
-      for (const item of this.plugin.statCardData.items) {
-        const rarityClass = getItemRarityClass(item.cost);
-        const itemEl = inventoryGrid.createEl("div", {
-          cls: `gamify-inventory-item clickable ${rarityClass}`,
-          attr: { "data-item-id": item.id }
-        });
-        itemEl.createEl("span", { text: item.name, cls: "gamify-item-name" });
-        const tooltipContent = itemEl.createEl("div", {
-          cls: "gamify-item-tooltip",
-          attr: { "aria-label": "Item details" }
-        });
-        tooltipContent.createEl("div", { text: item.description, cls: "gamify-item-description" });
-        if (item.effect && item.effect.length > 0) {
-          const effectsList = tooltipContent.createEl("div", { cls: "gamify-item-effects" });
-          for (const effect of Array.isArray(item.effect) ? item.effect : [item.effect]) {
-            effectsList.createEl("span", { text: effect, cls: "gamify-item-effect" });
-          }
-        }
-        itemEl.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.handleItemClick(item);
-        });
-      }
-    }
-    if (this.plugin.statCardData.activeEffects && Object.keys(this.plugin.statCardData.activeEffects).length > 0) {
-      const effectsSection = contentEl.createDiv({ cls: "gamify-active-effects" });
-      effectsSection.createEl("h4", { text: "Active Effects" });
-      const now = Date.now();
-      for (const [key, effect] of Object.entries(this.plugin.statCardData.activeEffects)) {
-        if (effect.expiresAt && effect.expiresAt > now) {
-          const timeLeft = Math.floor((effect.expiresAt - now) / (60 * 1e3 * 10));
-          const effectEl = effectsSection.createDiv({ cls: "gamify-effect-item" });
-          let effectName = "Unknown Effect";
-          let effectValue = "";
-          switch (key) {
-            case "storeDiscount":
-              effectName = `Store Discount`;
-              effectValue = `${effect.value * 100}%`;
-              break;
-            case "xpMultiplier":
-              effectName = `${theme.uiElements.xp} Multiplier`;
-              effectValue = `${effect.value}x`;
-              break;
-          }
-          effectEl.createEl("span", { text: `${effectName}: ${effectValue}` });
-          effectEl.createEl("span", { text: `${timeLeft} min remaining` });
-        }
-      }
-    }
-    if (this.plugin.statCardData.hasFamiliar) {
-      const familiarSection = contentEl.createDiv({ cls: "gamify-familiar-section" });
-      familiarSection.createEl("h4", { text: "familiar" });
-      familiarSection.createEl("p", {
-        text: "Your familiar is providing daily benefits."
-      });
-    }
-    if (this.plugin.statCardData.achievements && this.plugin.statCardData.achievements.length > 0) {
-      const achievementsSection = contentEl.createDiv({ cls: "gamify-achievements-section" });
-      achievementsSection.createEl("h3", { text: "Achievements", cls: "gamify-section-heading" });
-      const achievementsList = achievementsSection.createEl("ul", { cls: "gamify-achievements-list" });
-      for (const achievement of this.plugin.statCardData.achievements) {
-        const achievementItem = achievementsList.createEl("li", { cls: "gamify-achievement-item" });
-        const iconAndName = achievementItem.createEl("div", { cls: "gamify-achievement-header" });
-        iconAndName.createEl("strong", { text: achievement.name, cls: "gamify-achievement-name" });
-        const tooltip = achievementItem.createEl("span", { text: achievement.description, cls: "gamify-achievement-tooltip" });
-        achievementItem.addEventListener("mouseenter", () => {
-          tooltip.style.visibility = "visible";
-          tooltip.style.opacity = "1";
-        });
-        achievementItem.addEventListener("mouseleave", () => {
-          tooltip.style.visibility = "hidden";
-          tooltip.style.opacity = "0";
-        });
-        achievementItem.classList.add("gamify-glow");
-      }
-    }
-  }
-  handleItemClick(item) {
-    if (item.id === "infinite_inventory") {
-      this.plugin.activateInventoryTab();
-      return;
-    }
-    if (item.id === "mysterious_tablet") {
-      new RedeemTaskModal(this.plugin.app, this.plugin).open();
-      return;
-    }
-    if (item.effect && item.effect.includes("Set theme.")) {
-      const themeId = item.id.replace("_theme", "");
-      this.plugin.themeService.switchTheme(themeId);
-      this.close();
-      new _StatCardModal(this.app, this.plugin).open();
-      return;
-    }
-    if (item.effect) {
-      try {
-        const effectFunction = this.createEffectFunction(typeof item.effect === "string" ? item.effect : "");
-        effectFunction(this.plugin);
-        new import_obsidian.Notice(`Activated: ${item.name}`);
-      } catch (error) {
-        console.error("Error executing item effect:", error);
-        new import_obsidian.Notice("Error activating item effect.");
-      }
-    }
-  }
-  createEffectFunction(effect) {
-    try {
-      return new Function("plugin", effect);
-    } catch (error) {
-      console.error("Invalid effect code in JSON:", error);
-      return () => new import_obsidian.Notice("Error executing item effect.");
-    }
   }
   onClose() {
     const { contentEl } = this;
@@ -1394,28 +1518,59 @@ var StatCardModal = class _StatCardModal extends import_obsidian.Modal {
   }
 };
 
-// task-assessment-service.ts
-var import_obsidian2 = require("obsidian");
+// features/task-assessment-service.ts
+var import_obsidian4 = require("obsidian");
 var TaskAssessmentService = class {
   constructor(plugin) {
     this.requestQueue = [];
     this.isProcessing = false;
     this.lastRequestTime = 0;
     this.taskStoragePath = "QuestLog/task_storage.json";
+    this.taskLogPath = "QuestLog/task_activity_log.json";
+    this.taskStateListeners = [];
     this.plugin = plugin;
   }
-  async initializeTaskStorage() {
-    if (!await this.plugin.app.vault.adapter.exists(this.taskStoragePath)) {
-      await this.plugin.app.vault.adapter.write(
+  async initializeStorage() {
+    const { adapter } = this.plugin.app.vault;
+    if (!await adapter.exists(this.taskStoragePath)) {
+      await adapter.write(
         this.taskStoragePath,
         JSON.stringify({ processedTasks: [] })
       );
     }
+    if (!await adapter.exists(this.taskLogPath)) {
+      await adapter.write(
+        this.taskLogPath,
+        JSON.stringify({ taskChanges: [] })
+      );
+    }
+  }
+  registerTaskStateListener(callback) {
+    this.taskStateListeners.push(callback);
+  }
+  notifyStateChange(change) {
+    this.taskStateListeners.forEach((listener) => listener(change));
+  }
+  async logTaskStateChange(change) {
+    const { adapter } = this.plugin.app.vault;
+    let log = { taskChanges: [] };
+    if (await adapter.exists(this.taskLogPath)) {
+      try {
+        const data = await adapter.read(this.taskLogPath);
+        log = JSON.parse(data);
+      } catch (e) {
+        console.error("Error parsing task log:", e);
+      }
+    }
+    log.taskChanges.push(change);
+    await adapter.write(this.taskLogPath, JSON.stringify(log));
+    this.notifyStateChange(change);
   }
   async loadTaskStorage() {
-    if (await this.plugin.app.vault.adapter.exists(this.taskStoragePath)) {
-      const data = await this.plugin.app.vault.adapter.read(this.taskStoragePath);
+    const { adapter } = this.plugin.app.vault;
+    if (await adapter.exists(this.taskStoragePath)) {
       try {
+        const data = await adapter.read(this.taskStoragePath);
         const parsed = JSON.parse(data);
         return parsed.processedTasks || [];
       } catch (e) {
@@ -1448,22 +1603,33 @@ var TaskAssessmentService = class {
     const existingTaskIndex = tasks.findIndex(
       (task) => task.filePath === filePath && task.taskText === taskText
     );
+    const now = Date.now();
     if (existingTaskIndex >= 0) {
-      tasks[existingTaskIndex].completed = true;
-      tasks[existingTaskIndex].lastUpdated = Date.now();
-      tasks[existingTaskIndex].points = points;
-      tasks[existingTaskIndex].tags = tags;
+      tasks[existingTaskIndex] = {
+        ...tasks[existingTaskIndex],
+        completed: true,
+        lastUpdated: now,
+        points,
+        tags
+      };
     } else {
       tasks.push({
         filePath,
         taskText,
         completed: true,
-        lastUpdated: Date.now(),
+        lastUpdated: now,
         points,
         tags
       });
     }
     await this.saveTaskStorage(tasks);
+    await this.logTaskStateChange({
+      taskText,
+      filePath,
+      newState: "completed",
+      timestamp: now,
+      points
+    });
   }
   async markTaskUncompleted(filePath, taskText) {
     const tasks = await this.loadTaskStorage();
@@ -1472,15 +1638,23 @@ var TaskAssessmentService = class {
     );
     if (existingTaskIndex >= 0 && tasks[existingTaskIndex].completed) {
       const points = tasks[existingTaskIndex].points;
+      const now = Date.now();
       tasks[existingTaskIndex].completed = false;
-      tasks[existingTaskIndex].lastUpdated = Date.now();
+      tasks[existingTaskIndex].lastUpdated = now;
       await this.saveTaskStorage(tasks);
+      await this.logTaskStateChange({
+        taskText,
+        filePath,
+        newState: "uncompleted",
+        timestamp: now,
+        points
+      });
       if (this.plugin.settings.deductPointsForUnchecking) {
         this.plugin.statCardData.points -= points;
         this.plugin.statCardData.stats.tasksUnchecked++;
         this.plugin.statCardData.stats.totalPointsDeducted += points;
         this.plugin.statCardService.refreshUI();
-        new import_obsidian2.Notice(`Task unchecked. Deducted ${points} points.`);
+        new import_obsidian4.Notice(`Task unchecked. Deducted ${points} points.`);
       }
     }
   }
@@ -1506,85 +1680,84 @@ var TaskAssessmentService = class {
     }
   }
   extractTasksFromNote(content) {
-    const tasks = [];
     const taskRegex = /- \[([ xX])\]\s+(.*?)(?:\n|$)/g;
+    const tasks = [];
     let match;
     while ((match = taskRegex.exec(content)) !== null) {
-      const isCompleted = match[1].toLowerCase() === "x";
-      const taskText = match[2].trim();
       tasks.push({
-        taskText,
-        completed: isCompleted
+        taskText: match[2].trim(),
+        completed: match[1].toLowerCase() === "x"
       });
     }
     return tasks;
   }
   async assessCompletedTasks() {
-    if (this.plugin.settings.trackedNotes.length === 0) {
-      new import_obsidian2.Notice('No notes are being tracked. Add notes using the "Track Current Note for Tasks" command.');
+    const { settings, app, statCardData, statCardService } = this.plugin;
+    if (settings.trackedNotes.length === 0) {
+      new import_obsidian4.Notice('No notes are being tracked. Add notes using the "Track Current Note for Tasks" command.');
       return;
     }
     let newTasksAssessing = 0;
-    for (const notePath of this.plugin.settings.trackedNotes) {
-      const file = this.plugin.app.vault.getAbstractFileByPath(notePath);
-      if (file instanceof import_obsidian2.TFile) {
-        const content = await this.plugin.app.vault.read(file);
+    for (const notePath of settings.trackedNotes) {
+      const file = app.vault.getAbstractFileByPath(notePath);
+      if (file instanceof import_obsidian4.TFile) {
+        const content = await app.vault.read(file);
         await this.processNoteTasks(content, file.path);
         const tasks = this.extractTasksFromNote(content);
         const completedTasks = tasks.filter((task) => task.completed);
         for (const task of completedTasks) {
-          const isAlreadyProcessed = await this.isTaskProcessed(file.path, task.taskText);
-          if (!isAlreadyProcessed) {
+          if (!await this.isTaskProcessed(file.path, task.taskText)) {
             newTasksAssessing++;
           }
         }
       }
     }
     if (newTasksAssessing > 0) {
-      new import_obsidian2.Notice(`Assessment started for ${newTasksAssessing} new completed tasks.`);
-      this.plugin.statCardData.stats.tasksCompleted += 1;
+      new import_obsidian4.Notice(`Assessment started for ${newTasksAssessing} new completed tasks.`);
+      statCardData.stats.tasksCompleted += 1;
       this.plugin.updateStreak();
-      this.plugin.checkForAchievements();
-      this.plugin.statCardService.refreshUI();
-    } else {
-      new import_obsidian2.Notice("Scan complete! No new completed tasks found.");
+      this.plugin.achievementsService.checkForAchievements();
+      statCardService.refreshUI();
     }
   }
   queueTaskAssessment(filePath, taskText, tags) {
+    const { processingIndicatorService, statCardData, statCardService } = this.plugin;
     const task = async () => {
       try {
         const points = await this.plugin.calculatePointsForTask(taskText, tags);
-        this.plugin.statCardData.points += points;
-        this.plugin.statCardData.stats.tasksCompleted++;
-        this.plugin.statCardData.stats.totalPointsEarned += points;
-        this.plugin.checkForAchievements();
+        statCardData.points += points;
+        statCardData.stats.tasksCompleted++;
+        statCardData.stats.totalPointsEarned += points;
+        this.plugin.achievementsService.checkForAchievements();
         await this.addProcessedTask(filePath, taskText, points, tags);
-        this.plugin.statCardService.refreshUI();
-        new import_obsidian2.Notice(`Task assessed! Earned ${points} points.`);
+        statCardService.refreshUI();
+        new import_obsidian4.Notice(`Task assessed! Earned ${points} points.`);
       } catch (error) {
         console.error("Error assessing task:", error);
-        new import_obsidian2.Notice("Error assessing task. See console for details.");
+        new import_obsidian4.Notice("Error assessing task. See console for details.");
       }
     };
-    this.plugin.processingIndicatorService.startProcessing("assessment");
+    processingIndicatorService.startProcessing("assessment");
     this.requestQueue.push(task);
     try {
       if (!this.isProcessing) {
         this.processQueue();
       }
     } finally {
-      this.plugin.processingIndicatorService.endProcessing();
+      processingIndicatorService.endProcessing();
     }
   }
   async processQueue() {
+    var _a;
     if (this.requestQueue.length === 0) {
       this.isProcessing = false;
       return;
     }
     this.isProcessing = true;
-    if (this.plugin.settings.rateLimiting && this.plugin.settings.rateLimiting.enabled) {
+    const { settings } = this.plugin;
+    if ((_a = settings.rateLimiting) == null ? void 0 : _a.enabled) {
       const now = Date.now();
-      const minTimeGap = 6e4 / this.plugin.settings.rateLimiting.requestsPerMinute;
+      const minTimeGap = 6e4 / settings.rateLimiting.requestsPerMinute;
       const timeElapsed = now - this.lastRequestTime;
       if (timeElapsed < minTimeGap) {
         await new Promise((resolve) => setTimeout(resolve, minTimeGap - timeElapsed));
@@ -1603,187 +1776,615 @@ var TaskAssessmentService = class {
       await this.processNoteTasks(content, file.path);
     }
   }
+  async deleteTask(filePath, taskText) {
+    const tasks = await this.loadTaskStorage();
+    const filteredTasks = tasks.filter(
+      (task) => !(task.filePath === filePath && task.taskText === taskText)
+    );
+    await this.saveTaskStorage(filteredTasks);
+  }
+  async getRecentTaskActivity(limit = 10) {
+    const { adapter } = this.plugin.app.vault;
+    if (await adapter.exists(this.taskLogPath)) {
+      try {
+        const data = await adapter.read(this.taskLogPath);
+        const log = JSON.parse(data);
+        return (log.taskChanges || []).sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+      } catch (e) {
+        console.error("Error parsing task log:", e);
+        return [];
+      }
+    }
+    return [];
+  }
 };
 
-// task-storage-viewer.ts
-var import_obsidian3 = require("obsidian");
-var TaskStorageViewer = class extends import_obsidian3.Modal {
-  constructor(app, plugin, taskAssessmentService) {
-    super(app);
-    this.statusFilter = "all";
+// views/task-storage-viewer.ts
+var import_obsidian5 = require("obsidian");
+var TASK_STORAGE_VIEW_TYPE = "task-storage-view";
+var TaskStorageViewer = class extends import_obsidian5.ItemView {
+  constructor(leaf, plugin, taskAssessmentService) {
+    super(leaf);
+    this.filterOptions = {
+      text: "",
+      status: "all"
+    };
     this.plugin = plugin;
     this.taskAssessmentService = taskAssessmentService;
+  }
+  getViewType() {
+    return TASK_STORAGE_VIEW_TYPE;
+  }
+  getDisplayText() {
+    return "Task Storage";
   }
   async onOpen() {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("vq-task-storage-viewer");
     contentEl.createEl("h2", { text: "Task Storage Viewer" });
-    const filterContainer = contentEl.createDiv({ cls: "vq-filter-container" });
-    this.textFilter = new import_obsidian3.TextComponent(filterContainer).setPlaceholder("Filter by text or file path").onChange(async (value) => {
-      await this.renderTaskList(value, this.statusFilter);
+    this.createFilterSection(contentEl);
+    this.createActionButtons(contentEl);
+    this.activityLogSection = contentEl.createDiv({ cls: "vq-activity-log-container" });
+    this.activityLogSection.createEl("h3", { text: "Recent Activity" });
+    this.taskListContainer = contentEl.createDiv({ cls: "vq-task-list-container" });
+    this.taskAssessmentService.registerTaskStateListener(this.handleTaskStateChange.bind(this));
+    await this.refreshView();
+  }
+  createFilterSection(containerEl) {
+    const filterContainer = containerEl.createDiv({ cls: "vq-filter-container" });
+    this.textFilter = new import_obsidian5.TextComponent(filterContainer).setPlaceholder("Filter by text or file path").onChange(async (value) => {
+      this.filterOptions.text = value;
+      await this.renderTaskList();
     });
-    const filterOptions = ["all", "completed", "uncompleted"];
-    new import_obsidian3.Setting(filterContainer).setName("Status").addDropdown((dropdown) => {
-      filterOptions.forEach((option) => {
-        dropdown.addOption(option, option.charAt(0).toUpperCase() + option.slice(1));
+    const statusOptions = [
+      { value: "all", display: "All" },
+      { value: "completed", display: "Completed" },
+      { value: "uncompleted", display: "Uncompleted" }
+    ];
+    new import_obsidian5.Setting(filterContainer).setName("Status").addDropdown((dropdown) => {
+      statusOptions.forEach((option) => {
+        dropdown.addOption(option.value, option.display);
       });
-      dropdown.setValue("all");
+      dropdown.setValue(this.filterOptions.status);
       dropdown.onChange(async (value) => {
-        this.statusFilter = value;
-        await this.renderTaskList(this.textFilter.getValue(), value);
+        this.filterOptions.status = value;
+        await this.renderTaskList();
       });
       return dropdown;
     });
-    const actionContainer = contentEl.createDiv({ cls: "vq-action-container" });
-    new import_obsidian3.ButtonComponent(actionContainer).setButtonText("Refresh").onClick(async () => {
-      await this.renderTaskList(this.textFilter.getValue(), this.statusFilter);
-    });
-    new import_obsidian3.ButtonComponent(actionContainer).setButtonText("Clear All Data").setClass("mod-warning").onClick(async () => {
+  }
+  createActionButtons(containerEl) {
+    const actionContainer = containerEl.createDiv({ cls: "vq-action-container" });
+    new import_obsidian5.ButtonComponent(actionContainer).setButtonText("Refresh").setClass("mod-primary").onClick(() => this.refreshView());
+    new import_obsidian5.ButtonComponent(actionContainer).setButtonText("Clear All Data").setClass("mod-warning").onClick(async () => {
       if (confirm("Are you sure you want to clear all task data? This action cannot be undone.")) {
         await this.taskAssessmentService.saveTaskStorage([]);
-        await this.renderTaskList("", "all");
+        await this.refreshView();
       }
     });
-    contentEl.createDiv({ cls: "vq-task-list-container" });
-    const style = document.createElement("style");
-    style.textContent = `
-            .vq-task-storage-viewer {
-                resize: both;
-                overflow: auto;
-                max-width: 190vw;
-                max-height: 190vh;
-                position: relative;
-                border: 1px solid #ccc;
-                padding: 10px;
-            }
-        `;
-    document.head.appendChild(style);
-    await this.renderTaskList("", "all");
   }
-  async renderTaskList(textFilter, statusFilter) {
-    const { contentEl } = this;
-    const taskListContainer = contentEl.querySelector(".vq-task-list-container");
-    if (!taskListContainer) return;
-    taskListContainer.empty();
+  handleTaskStateChange(change) {
+    this.refreshView();
+  }
+  async refreshView() {
+    await Promise.all([
+      this.renderActivityLog(),
+      this.renderTaskList()
+    ]);
+  }
+  async renderActivityLog() {
+    this.activityLogSection.empty();
+    this.activityLogSection.createEl("h3", { text: "Recent Activity" });
+    const recentActivity = await this.taskAssessmentService.getRecentTaskActivity(5);
+    if (recentActivity.length === 0) {
+      this.activityLogSection.createEl("p", { text: "No recent activity." });
+      return;
+    }
+    const activityList = this.activityLogSection.createEl("ul", { cls: "vq-activity-list" });
+    for (const activity of recentActivity) {
+      const item = activityList.createEl("li", { cls: "vq-activity-item" });
+      const statusClass = activity.newState === "completed" ? "vq-completed" : "vq-uncompleted";
+      const statusIcon = activity.newState === "completed" ? "\u2713" : "\u25CB";
+      const statusIndicator = item.createSpan({ cls: `vq-status ${statusClass}`, text: statusIcon });
+      const filePathParts = activity.filePath.split("/");
+      const fileName = filePathParts[filePathParts.length - 1];
+      const formattedTime = new Date(activity.timestamp).toLocaleTimeString();
+      item.createSpan({
+        text: ` Task ${activity.newState} at ${formattedTime}: "${this.truncateText(activity.taskText, 40)}" in ${fileName}`
+      });
+    }
+  }
+  async renderTaskList() {
+    if (!this.taskListContainer) return;
+    this.taskListContainer.empty();
     const tasks = await this.taskAssessmentService.loadTaskStorage();
     const filteredTasks = tasks.filter((task) => {
-      const textMatch = !textFilter || task.taskText.toLowerCase().includes(textFilter.toLowerCase()) || task.filePath.toLowerCase().includes(textFilter.toLowerCase());
+      const textMatch = !this.filterOptions.text || task.taskText.toLowerCase().includes(this.filterOptions.text.toLowerCase()) || task.filePath.toLowerCase().includes(this.filterOptions.text.toLowerCase());
       let statusMatch = true;
-      if (statusFilter === "completed") {
+      if (this.filterOptions.status === "completed") {
         statusMatch = task.completed;
-      } else if (statusFilter === "uncompleted") {
+      } else if (this.filterOptions.status === "uncompleted") {
         statusMatch = !task.completed;
       }
       return textMatch && statusMatch;
     });
     filteredTasks.sort((a, b) => b.lastUpdated - a.lastUpdated);
-    const statsEl = taskListContainer.createEl("div", { cls: "vq-stats-container" });
+    const statsEl = this.taskListContainer.createEl("div", { cls: "vq-stats-container" });
     statsEl.createEl("p", {
       text: `Showing ${filteredTasks.length} of ${tasks.length} tasks`
     });
     if (filteredTasks.length === 0) {
-      taskListContainer.createEl("p", { text: "No tasks found." });
+      this.taskListContainer.createEl("p", { text: "No tasks found." });
       return;
     }
-    const table = taskListContainer.createEl("table", { cls: "vq-task-table" });
-    const thead = table.createEl("thead");
-    const headerRow = thead.createEl("tr");
-    headerRow.createEl("th", { text: "Status" });
-    headerRow.createEl("th", { text: "Task" });
-    headerRow.createEl("th", { text: "File" });
-    headerRow.createEl("th", { text: "Points" });
-    headerRow.createEl("th", { text: "Tags" });
-    headerRow.createEl("th", { text: "Last Updated" });
-    headerRow.createEl("th", { text: "Actions" });
-    const tbody = table.createEl("tbody");
-    for (const task of filteredTasks) {
-      const row = tbody.createEl("tr");
-      const statusCell = row.createEl("td");
-      statusCell.createEl("span", {
-        cls: `vq-status ${task.completed ? "vq-completed" : "vq-uncompleted"}`,
-        text: task.completed ? "\u2713" : "\u25CB"
-      });
-      row.createEl("td", {
-        cls: "vq-task-text",
-        text: task.taskText.length > 50 ? task.taskText.slice(0, 50) + "..." : task.taskText
-      }).setAttribute("title", task.taskText);
-      const filePathParts = task.filePath.split("/");
-      const fileName = filePathParts[filePathParts.length - 1];
-      row.createEl("td", { text: fileName }).setAttribute("title", task.filePath);
-      row.createEl("td", { cls: "vq-points", text: task.points.toString() });
-      const tagsCell = row.createEl("td", { cls: "vq-tags" });
-      if (task.tags && task.tags.length > 0) {
-        for (const tag of task.tags) {
-          tagsCell.createEl("span", { cls: "vq-tag", text: tag });
-        }
-      } else {
-        tagsCell.setText("None");
-      }
-      const date = new Date(task.lastUpdated);
-      row.createEl("td", {
-        text: date.toLocaleDateString() + " " + date.toLocaleTimeString()
-      });
-      const actionsCell = row.createEl("td", { cls: "vq-actions" });
-      new import_obsidian3.ButtonComponent(actionsCell).setButtonText("Go to").setTooltip("Open this file").onClick(() => {
-        const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (file && file instanceof import_obsidian3.TFile) {
-          const leaf = this.app.workspace.activeLeaf;
-          if (leaf) {
-            leaf.openFile(file);
-          } else {
-            new import_obsidian3.Notice("No active leaf to open file");
-          }
-        } else {
-          new import_obsidian3.Notice(`File not found: ${task.filePath}`);
-        }
-      });
-      new import_obsidian3.ButtonComponent(actionsCell).setButtonText("Delete").setClass("mod-warning").setTooltip("Remove this task from storage").onClick(async () => {
-        if (confirm("Are you sure you want to delete this task from storage?")) {
-          const tasks2 = await this.taskAssessmentService.loadTaskStorage();
-          const updatedTasks = tasks2.filter(
-            (t) => !(t.filePath === task.filePath && t.taskText === task.taskText)
-          );
-          await this.taskAssessmentService.saveTaskStorage(updatedTasks);
-          await this.renderTaskList(textFilter, statusFilter);
-        }
-      });
-    }
+    this.createTaskTable(this.taskListContainer, filteredTasks);
   }
-  onClose() {
+  createTaskTable(container, tasks) {
+    const table = container.createEl("table", { cls: "vq-task-table" });
+    const headerRow = table.createEl("thead").createEl("tr");
+    ["Status", "Task", "File", "Points", "Tags", "Last Updated", "Actions"].forEach((header) => headerRow.createEl("th", { text: header }));
+    const tbody = table.createEl("tbody");
+    tasks.forEach((task) => this.createTaskRow(tbody, task));
+  }
+  createTaskRow(tbody, task) {
+    const row = tbody.createEl("tr");
+    const statusCell = row.createEl("td");
+    statusCell.createEl("span", {
+      cls: `vq-status ${task.completed ? "vq-completed" : "vq-uncompleted"}`,
+      text: task.completed ? "\u2713" : "\u25CB"
+    });
+    row.createEl("td", {
+      cls: "vq-task-text",
+      text: this.truncateText(task.taskText, 50)
+    }).setAttribute("title", task.taskText);
+    const filePathParts = task.filePath.split("/");
+    const fileName = filePathParts[filePathParts.length - 1];
+    row.createEl("td", { text: fileName }).setAttribute("title", task.filePath);
+    row.createEl("td", { cls: "vq-points", text: task.points.toString() });
+    const tagsCell = row.createEl("td", { cls: "vq-tags" });
+    if (task.tags && task.tags.length > 0) {
+      task.tags.forEach((tag) => {
+        tagsCell.createEl("span", { cls: "vq-tag", text: tag });
+      });
+    } else {
+      tagsCell.setText("None");
+    }
+    const date = new Date(task.lastUpdated);
+    row.createEl("td", {
+      text: date.toLocaleDateString() + " " + date.toLocaleTimeString()
+    });
+    const actionsCell = row.createEl("td", { cls: "vq-actions" });
+    new import_obsidian5.ButtonComponent(actionsCell).setButtonText("Delete").setClass("mod-warning").onClick(async () => {
+      if (confirm(`Are you sure you want to delete this task record?`)) {
+        await this.taskAssessmentService.deleteTask(task.filePath, task.taskText);
+        await this.renderTaskList();
+      }
+    });
+  }
+  truncateText(text, maxLength) {
+    return text.length > maxLength ? text.slice(0, maxLength) + "..." : text;
+  }
+  async onClose() {
     const { contentEl } = this;
     contentEl.empty();
   }
 };
 var TaskStorageRibbonIcon = class {
   constructor(plugin, taskAssessmentService) {
-    this.plugin = plugin;
-    this.taskAssessmentService = taskAssessmentService;
-    const ribbonIconEl = this.plugin.addRibbonIcon(
+    plugin.addRibbonIcon(
       "list-checks",
       "View Task Storage",
       () => {
-        new TaskStorageViewer(this.plugin.app, this.plugin, this.taskAssessmentService).open();
+        plugin.activateTaskStorageTab();
       }
     );
   }
 };
 
-// itemStore.ts
-var import_obsidian4 = require("obsidian");
+// features/itemStore.ts
+var import_obsidian7 = require("obsidian");
+
+// features/initializeStoreItems.ts
+var import_obsidian6 = require("obsidian");
+async function initializeStoreItems(plugin) {
+  const items = [
+    {
+      id: "store_app",
+      name: "Commerce Card",
+      description: "Allows you to open the store from the inventory.",
+      cost: 10,
+      category: "artifact",
+      owned: false,
+      levelRequired: 1,
+      hidden: false,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("You can now access the store from the inventory!");
+      }
+    },
+    {
+      id: "theme_toggler",
+      name: "Theme Toggler",
+      description: "Allows you to switch themes.",
+      cost: 10,
+      category: "cosmetic",
+      owned: false,
+      levelRequired: 1,
+      hidden: false,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("You can now change themes from the stats menu!");
+      }
+    },
+    {
+      id: "mysterious_tablet",
+      name: "Mysterious Tablet",
+      description: "A mysterious tablet that resonates with an ethereal hum. It feels like a communicator...?",
+      cost: 100,
+      category: "artifact",
+      owned: false,
+      levelRequired: 0,
+      effect: (plugin2) => {
+        new RedeemTaskModal(plugin2.app, plugin2).open();
+        new import_obsidian6.Notice("A mysterious tablet falls into your hands. A new icon appears in the Ribbon. A new command enters your mind.");
+      }
+    },
+    {
+      id: "minor_xp_boost",
+      name: "Experience Potion (Minor)",
+      description: "Gain 100 immediate XP.",
+      cost: 25,
+      category: "boost",
+      owned: false,
+      levelRequired: 0,
+      effect: (plugin2) => {
+        plugin2.statCardData.xp += 100;
+        new import_obsidian6.Notice("Your soul absorbs the energy, growing stronger...");
+      }
+    },
+    {
+      id: "major_xp_boost",
+      name: "Experience Potion (Major)",
+      description: "Gain 500 immediate XP.",
+      cost: 100,
+      category: "boost",
+      owned: false,
+      levelRequired: 10,
+      hidden: true,
+      effect: (plugin2) => {
+        plugin2.statCardData.xp += 500;
+        new import_obsidian6.Notice("A surge of power courses through your essence!");
+      }
+    },
+    {
+      id: "writing_skill_boost",
+      name: "Quill of Dark Scriptures I",
+      description: "Gain 1 level in Writing skill.",
+      cost: 75,
+      category: "boost",
+      owned: false,
+      skillRequired: { skillId: "writing", level: 2 },
+      hidden: false,
+      effect: (plugin2) => {
+        const skill = plugin2.statCardData.skills.find((s) => s.id === "writing");
+        if (skill) {
+          skill.level += 1;
+          new import_obsidian6.Notice("Your Writing skill has been augmented!");
+        }
+      }
+    },
+    {
+      id: "research_skill_boost",
+      name: "Tome of Forbidden Knowledge I",
+      description: "Gain 1 level in Research skill.",
+      cost: 75,
+      category: "boost",
+      owned: false,
+      skillRequired: { skillId: "research", level: 2 },
+      hidden: false,
+      effect: (plugin2) => {
+        const skill = plugin2.statCardData.skills.find((s) => s.id === "research");
+        if (skill) {
+          skill.level += 1;
+          new import_obsidian6.Notice("Your Research skill has been infused with eldritch wisdom!");
+        }
+      }
+    },
+    {
+      id: "organization_skill_boost",
+      name: "Cataloguing System I",
+      description: "Gain 1 level in Organization skill.",
+      cost: 75,
+      category: "boost",
+      owned: false,
+      skillRequired: { skillId: "organization", level: 2 },
+      hidden: false,
+      effect: (plugin2) => {
+        const skill = plugin2.statCardData.skills.find((s) => s.id === "organization");
+        if (skill) {
+          skill.level += 1;
+          new import_obsidian6.Notice("Your Organization skill has been enhanced with supernatural precision!");
+        }
+      }
+    },
+    {
+      id: "dark_ritual_discount",
+      name: "Blood Pact I",
+      description: "All requests cost 20% less for 24 hours.",
+      cost: 150,
+      category: "ritual",
+      owned: false,
+      levelRequired: 10,
+      hidden: false,
+      effect: (plugin2) => {
+        plugin2.statCardData.activeEffects = plugin2.statCardData.activeEffects || {};
+        plugin2.statCardData.activeEffects.storeDiscount = {
+          value: 0.2,
+          // 20% discount
+          expiresAt: Date.now() + 24 * 60 * 60 * 1e3
+        };
+        new import_obsidian6.Notice("A discount... how quaint...");
+      }
+    },
+    {
+      id: "demonic_theme",
+      name: "Demonic Pact",
+      description: "The Grimoire emits a disturbing light.",
+      cost: 200,
+      category: "cosmetic",
+      owned: false,
+      levelRequired: 5,
+      hidden: false,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("You hear the echoes of demonic screams.");
+      }
+    },
+    {
+      id: "celestial_theme",
+      name: "Celestial Codex",
+      description: "A radiant transformation, aligning your interface with the heavens.",
+      cost: 200,
+      category: "cosmetic",
+      owned: false,
+      levelRequired: 5,
+      hidden: false,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("Your interface now shimmers with cosmic brilliance.");
+      }
+    },
+    {
+      id: "cybernetic_theme",
+      name: "Neural Interface",
+      description: "A sleek, high-tech upgrade, turning your UI into a cybernetic control hub.",
+      cost: 200,
+      category: "cosmetic",
+      owned: false,
+      levelRequired: 10,
+      hidden: false,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("System update complete. Cybernetic enhancements activated.");
+      }
+    },
+    {
+      id: "arcane_theme",
+      name: "Arcane Tome",
+      description: "A mystical upgrade, bathing your interface in ancient magic.",
+      cost: 200,
+      category: "cosmetic",
+      owned: false,
+      levelRequired: 10,
+      hidden: true,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("Arcane glyphs swirl around you as your Tome of Elders awakens.");
+      }
+    },
+    {
+      id: "eldritch_theme",
+      name: "Necronomicon",
+      description: "A disturbing, otherworldly theme, for fans of eldritch horror.",
+      cost: 200,
+      category: "cosmetic",
+      owned: false,
+      levelRequired: 10,
+      hidden: true,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("The shadows deepen. You hear whispers in forgotten tongues...");
+      }
+    },
+    {
+      id: "rogue_theme",
+      name: "Phantom's Veil",
+      description: "A shadowy, assassin-inspired theme for those who thrive in secrecy.",
+      cost: 200,
+      category: "cosmetic",
+      owned: false,
+      levelRequired: 10,
+      hidden: true,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("You vanish into the shadows, your interface adapting to the underworld.");
+      }
+    },
+    {
+      id: "xp_multiplier",
+      name: "Soul Binding Contract",
+      description: "Gain 1.5x XP from all activities for 24 hours.",
+      cost: 175,
+      category: "ritual",
+      owned: false,
+      levelRequired: 15,
+      effect: (plugin2) => {
+        plugin2.statCardData.activeEffects = plugin2.statCardData.activeEffects || {};
+        plugin2.statCardData.activeEffects.xpMultiplier = {
+          value: 1.5,
+          expiresAt: Date.now() + 24 * 60 * 60 * 1e3
+        };
+        new import_obsidian6.Notice("Your soul now absorbs more energy from your labors...");
+      }
+    },
+    {
+      id: "familiar",
+      name: "Familiar",
+      description: "Summon a small familiar that provides random bonuses each day.",
+      cost: 300,
+      category: "artifact",
+      owned: false,
+      levelRequired: 50,
+      hidden: false,
+      effect: (plugin2) => {
+        plugin2.statCardData.hasFamiliar = true;
+        setupFamiliarDailyBonus(plugin2);
+        new import_obsidian6.Notice("A small creature materializes, bound to your service!");
+      }
+    },
+    {
+      id: "infinite_inventory",
+      name: "Infinite Inventory",
+      description: "A storage tab to store your items.",
+      cost: 500,
+      category: "artifact",
+      owned: false,
+      levelRequired: 1,
+      hidden: true,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("You bought an Inventory Box!");
+      }
+    },
+    {
+      id: "system_control",
+      name: "Administrative Dominion",
+      description: "Gain administrative access to the system.",
+      cost: 500,
+      category: "artifact",
+      owned: false,
+      levelRequired: 100,
+      hidden: false,
+      effect: (plugin2) => {
+        const administratorTitle = {
+          id: "system_control",
+          name: "Administrator",
+          description: "A title given to those with control over the system.",
+          unlockedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          effect: [
+            "Grants full access to all system features",
+            "Allows modification of core settings"
+          ]
+        };
+        if (!plugin2.statCardData.titles.some((title) => title.id === "system_control")) {
+          plugin2.statCardData.titles.push(administratorTitle);
+        }
+        new import_obsidian6.Notice("You have been granted Administrator rights!");
+      }
+    },
+    {
+      id: "debugger",
+      name: "Debugger Rights",
+      description: "Unlocks hidden developer tools.",
+      cost: 500,
+      category: "artifact",
+      owned: false,
+      levelRequired: 10,
+      hidden: true,
+      effect: (plugin2) => {
+        const debuggerTitle = {
+          id: "debugger",
+          name: "Debugger",
+          description: "A title granted to those who uncover and resolve hidden issues.",
+          unlockedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          effect: [
+            "Unlocks hidden developer tools"
+          ]
+        };
+        if (!plugin2.statCardData.titles.some((title) => title.id === "debugger")) {
+          plugin2.statCardData.titles.push(debuggerTitle);
+        }
+        new import_obsidian6.Notice("You have been granted Debugger rights!");
+      }
+    },
+    {
+      id: "tagger",
+      name: "Tag Editor",
+      description: "Unlocks ability to add and edit tags.",
+      cost: 100,
+      category: "artifact",
+      owned: false,
+      levelRequired: 3,
+      hidden: false,
+      effect: (plugin2) => {
+        new import_obsidian6.Notice("You have been granted Tag editing rights!");
+      }
+    }
+  ];
+  await loadCustomItems(plugin, items);
+  return items;
+}
+function setupFamiliarDailyBonus(plugin) {
+  const now = /* @__PURE__ */ new Date();
+  const today = now.toDateString();
+  if (plugin.statCardData.lastFamiliarBonusDate !== today) {
+    const bonusType = Math.floor(Math.random() * 2);
+    const randomBonus = Math.floor(Math.random() * 100);
+    switch (bonusType) {
+      case 0:
+        plugin.statCardData.xp += randomBonus;
+        new import_obsidian6.Notice(`Your familiar brings you a gift of ${randomBonus} XP!`);
+        break;
+      case 1:
+        plugin.statCardData.points += randomBonus;
+        new import_obsidian6.Notice(`Your familiar has collected ${randomBonus} tokens for you!`);
+        break;
+    }
+    plugin.statCardData.lastFamiliarBonusDate = today;
+  }
+}
+async function loadCustomItems(plugin, items) {
+  const folderPath = "QuestLog/StoreInventory";
+  const files = plugin.app.vault.getFiles().filter(
+    (file) => file.path.startsWith(folderPath) && file.extension === "json"
+  );
+  for (const file of files) {
+    try {
+      const content = await plugin.app.vault.read(file);
+      const customItems = JSON.parse(content);
+      customItems.forEach((item) => {
+        if (!items.find((existingItem) => existingItem.id === item.id)) {
+          items.push({
+            ...item,
+            effect: createEffectFunction(typeof item.effect === "string" ? item.effect : "")
+          });
+        }
+      });
+    } catch (error) {
+      console.error(`Failed to load custom item from ${file.path}:`, error);
+    }
+  }
+}
+function createEffectFunction(effect) {
+  try {
+    return new Function("plugin", effect);
+  } catch (error) {
+    console.error("Invalid effect code in JSON:", error);
+    return () => new import_obsidian6.Notice("Error executing custom item effect.");
+  }
+}
+
+// features/itemStore.ts
 var ItemStoreService = class {
   constructor(plugin) {
     this.items = [];
     this.debugMode = false;
     this.plugin = plugin;
-    this.initializeStoreItems();
-    this.checkDebugStatus();
+    this.initializeStore();
   }
-  checkDebugStatus() {
-    const debugTitle = "debugger";
-    this.debugMode = this.plugin.statCardData.ownedItems.includes(debugTitle);
-    if (this.debugMode) {
-      console.log("Debug mode active");
+  async initializeStore() {
+    this.items = await initializeStoreItems(this.plugin);
+    this.syncOwnedItems();
+  }
+  syncOwnedItems() {
+    if (!this.plugin.statCardData.ownedItems) {
+      this.plugin.statCardData.ownedItems = [];
+      return;
+    }
+    for (const item of this.items) {
+      item.owned = this.plugin.statCardData.ownedItems.includes(item.id);
     }
   }
   getAllItems() {
@@ -1792,349 +2393,13 @@ var ItemStoreService = class {
   getItem(itemId) {
     return this.items.find((item) => item.id === itemId) || null;
   }
-  async initializeStoreItems() {
-    this.items = [
-      {
-        id: "theme_toggler",
-        name: "Theme Toggler",
-        description: "Allows you to switch themes.",
-        cost: 10,
-        category: "cosmetic",
-        owned: false,
-        levelRequired: 1,
-        hidden: false,
-        effect: (plugin) => {
-          new import_obsidian4.Notice("You can now change themes from the stats menu!");
-        }
-      },
-      {
-        id: "mysterious_tablet",
-        name: "Mysterious Tablet",
-        description: "A mysterious tablet that resonates with an ethereal hum. It feels like a communicator...?",
-        cost: 100,
-        category: "artifact",
-        owned: false,
-        levelRequired: 0,
-        effect: (plugin) => {
-          new RedeemTaskModal(this.plugin.app, this.plugin).open();
-          new import_obsidian4.Notice("A mysterious tablet falls into your hands. A new icon appears in the Ribbon. A new command enters your mind.");
-        }
-      },
-      {
-        id: "minor_xp_boost",
-        name: "Experience Potion (Minor)",
-        description: "Gain 100 immediate XP.",
-        cost: 25,
-        category: "boost",
-        owned: false,
-        levelRequired: 0,
-        effect: (plugin) => {
-          plugin.statCardData.xp += 100;
-          new import_obsidian4.Notice("Your soul absorbs the energy, growing stronger...");
-        }
-      },
-      {
-        id: "major_xp_boost",
-        name: "Experience Potion (Major)",
-        description: "Gain 500 immediate XP.",
-        cost: 100,
-        category: "boost",
-        owned: false,
-        levelRequired: 10,
-        hidden: true,
-        effect: (plugin) => {
-          plugin.statCardData.xp += 500;
-          new import_obsidian4.Notice("A surge of power courses through your essence!");
-        }
-      },
-      {
-        id: "writing_skill_boost",
-        name: "Quill of Dark Scriptures I",
-        description: "Gain 1 level in Writing skill.",
-        cost: 75,
-        category: "boost",
-        owned: false,
-        skillRequired: { skillId: "writing", level: 2 },
-        hidden: false,
-        effect: (plugin) => {
-          const skill = plugin.statCardData.skills.find((s) => s.id === "writing");
-          if (skill) {
-            skill.level += 1;
-            new import_obsidian4.Notice("Your Writing skill has been augmented!");
-          }
-        }
-      },
-      {
-        id: "research_skill_boost",
-        name: "Tome of Forbidden Knowledge I",
-        description: "Gain 1 level in Research skill.",
-        cost: 75,
-        category: "boost",
-        owned: false,
-        skillRequired: { skillId: "research", level: 2 },
-        hidden: false,
-        effect: (plugin) => {
-          const skill = plugin.statCardData.skills.find((s) => s.id === "research");
-          if (skill) {
-            skill.level += 1;
-            new import_obsidian4.Notice("Your Research skill has been infused with eldritch wisdom!");
-          }
-        }
-      },
-      {
-        id: "organization_skill_boost",
-        name: "Cataloguing System I",
-        description: "Gain 1 level in Organization skill.",
-        cost: 75,
-        category: "boost",
-        owned: false,
-        skillRequired: { skillId: "organization", level: 2 },
-        hidden: false,
-        effect: (plugin) => {
-          const skill = plugin.statCardData.skills.find((s) => s.id === "organization");
-          if (skill) {
-            skill.level += 1;
-            new import_obsidian4.Notice("Your Organization skill has been enhanced with supernatural precision!");
-          }
-        }
-      },
-      {
-        id: "dark_ritual_discount",
-        name: "Blood Pact I",
-        description: "All requests cost 20% less for 24 hours.",
-        cost: 150,
-        category: "ritual",
-        owned: false,
-        levelRequired: 10,
-        hidden: false,
-        effect: (plugin) => {
-          plugin.statCardData.activeEffects = plugin.statCardData.activeEffects || {};
-          plugin.statCardData.activeEffects.storeDiscount = {
-            value: 0.2,
-            // 20% discount
-            expiresAt: Date.now() + 24 * 60 * 60 * 1e3
-          };
-          new import_obsidian4.Notice("A discount... how quaint...");
-        }
-      },
-      {
-        id: "demonic_theme",
-        name: "Demonic Pact",
-        description: "The Grimoire emits a disturbing light.",
-        cost: 200,
-        category: "cosmetic",
-        owned: false,
-        levelRequired: 5,
-        hidden: false,
-        effect: (plugin) => {
-          new import_obsidian4.Notice("You hear the echoes of demonic screams.");
-        }
-      },
-      {
-        id: "celestial_theme",
-        name: "Celestial Codex",
-        description: "A radiant transformation, aligning your interface with the heavens.",
-        cost: 200,
-        category: "cosmetic",
-        owned: false,
-        levelRequired: 5,
-        hidden: false,
-        effect: (plugin) => {
-          new import_obsidian4.Notice("Your interface now shimmers with cosmic brilliance.");
-        }
-      },
-      {
-        id: "cybernetic_theme",
-        name: "Neural Interface",
-        description: "A sleek, high-tech upgrade, turning your UI into a cybernetic control hub.",
-        cost: 200,
-        category: "cosmetic",
-        owned: false,
-        levelRequired: 10,
-        hidden: false,
-        effect: (plugin) => {
-          new import_obsidian4.Notice("System update complete. Cybernetic enhancements activated.");
-        }
-      },
-      {
-        id: "arcane_theme",
-        name: "Arcane Tome",
-        description: "A mystical upgrade, bathing your interface in ancient magic.",
-        cost: 200,
-        category: "cosmetic",
-        owned: false,
-        levelRequired: 10,
-        hidden: true,
-        effect: (plugin) => {
-          new import_obsidian4.Notice("Arcane glyphs swirl around you as your Tome of Elders awakens.");
-        }
-      },
-      {
-        id: "eldritch_theme",
-        name: "Necronomicon",
-        description: "A disturbing, otherworldly theme, for fans of eldritch horror.",
-        cost: 200,
-        category: "cosmetic",
-        owned: false,
-        levelRequired: 10,
-        hidden: true,
-        effect: (plugin) => {
-          new import_obsidian4.Notice("The shadows deepen. You hear whispers in forgotten tongues...");
-        }
-      },
-      {
-        id: "rogue_theme",
-        name: "Phantom\u2019s Veil",
-        description: "A shadowy, assassin-inspired theme for those who thrive in secrecy.",
-        cost: 200,
-        category: "cosmetic",
-        owned: false,
-        levelRequired: 10,
-        hidden: true,
-        effect: (plugin) => {
-          new import_obsidian4.Notice("You vanish into the shadows, your interface adapting to the underworld.");
-        }
-      },
-      {
-        id: "xp_multiplier",
-        name: "Soul Binding Contract",
-        description: "Gain 1.5x XP from all activities for 24 hours.",
-        cost: 175,
-        category: "ritual",
-        owned: false,
-        levelRequired: 15,
-        effect: (plugin) => {
-          plugin.statCardData.activeEffects = plugin.statCardData.activeEffects || {};
-          plugin.statCardData.activeEffects.xpMultiplier = {
-            value: 1.5,
-            expiresAt: Date.now() + 24 * 60 * 60 * 1e3
-          };
-          new import_obsidian4.Notice("Your soul now absorbs more energy from your labors...");
-        }
-      },
-      {
-        id: "familiar",
-        name: "Familiar",
-        description: "Summon a small familiar that provides random bonuses each day.",
-        cost: 300,
-        category: "artifact",
-        owned: false,
-        levelRequired: 50,
-        hidden: false,
-        effect: (plugin) => {
-          plugin.statCardData.hasFamiliar = true;
-          this.setupFamiliarDailyBonus();
-          new import_obsidian4.Notice("A small creature materializes, bound to your service!");
-        }
-      },
-      {
-        id: "infinite_inventory",
-        name: "Infinite Inventory",
-        description: "A storage tab to store your items.",
-        cost: 500,
-        category: "artifact",
-        owned: false,
-        levelRequired: 1,
-        hidden: true,
-        effect: (plugin) => {
-          new import_obsidian4.Notice("You bought an Inventory Box!");
-        }
-      },
-      {
-        id: "system_control",
-        name: "Administrative Dominion",
-        description: "Gain administrative access to the system.",
-        cost: 500,
-        category: "artifact",
-        owned: false,
-        levelRequired: 100,
-        hidden: false,
-        effect: (plugin) => {
-          const administratorTitle = {
-            id: "system_control",
-            name: "Administrator",
-            description: "A title given to those with control over the system.",
-            unlockedAt: (/* @__PURE__ */ new Date()).toISOString(),
-            effect: [
-              "Grants full access to all system features",
-              "Allows modification of core settings"
-            ]
-          };
-          if (!plugin.statCardData.titles.some((title) => title.id === "system_control")) {
-            plugin.statCardData.titles.push(administratorTitle);
-          }
-          new import_obsidian4.Notice("You have been granted Administrator rights!");
-        }
-      },
-      {
-        id: "debugger",
-        name: "Debugger Rights",
-        description: "Unlocks hidden developer tools.",
-        cost: 500,
-        category: "artifact",
-        owned: false,
-        levelRequired: 10,
-        hidden: true,
-        effect: (plugin) => {
-          const debuggerTitle = {
-            id: "debugger",
-            name: "Debugger",
-            description: "A title granted to those who uncover and resolve hidden issues.",
-            unlockedAt: (/* @__PURE__ */ new Date()).toISOString(),
-            effect: [
-              "Unlocks hidden developer tools"
-            ]
-          };
-          if (!plugin.statCardData.titles.some((title) => title.id === "debugger")) {
-            plugin.statCardData.titles.push(debuggerTitle);
-          }
-          new import_obsidian4.Notice("You have been granted Debugger rights!");
-        }
-      }
-    ];
-    await this.loadCustomItems();
-    if (!this.plugin.statCardData.ownedItems) {
-      this.plugin.statCardData.ownedItems = [];
-    }
-    if (this.plugin.statCardData.ownedItems) {
-      for (const item of this.items) {
-        if (this.plugin.statCardData.ownedItems.includes(item.id)) {
-          item.owned = true;
-        }
-      }
-    } else {
-      this.plugin.statCardData.ownedItems = [];
-    }
-  }
-  async setupFamiliarDailyBonus() {
-    const now = /* @__PURE__ */ new Date();
-    const today = now.toDateString();
-    if (this.plugin.statCardData.lastFamiliarBonusDate !== today) {
-      const bonusType = Math.floor(Math.random() * 2);
-      const randomBonus = Math.floor(Math.random() * 100);
-      switch (bonusType) {
-        case 0:
-          this.plugin.statCardData.xp += randomBonus;
-          new import_obsidian4.Notice(`Your familiar brings you a gift of ${randomBonus} XP!`);
-          break;
-        case 1:
-          this.plugin.statCardData.points += randomBonus;
-          new import_obsidian4.Notice(`Your familiar has collected ${randomBonus} tokens for you!`);
-          break;
-      }
-      this.plugin.statCardData.lastFamiliarBonusDate = today;
-    }
-  }
   getItems() {
     if (this.debugMode) {
       return this.items;
     }
-    return this.items.filter((item) => {
-      if (item.hidden && !this.meetsRequirements(item)) {
-        return false;
-      }
-      return true;
-    });
+    return this.items.filter(
+      (item) => !(item.hidden && !this.meetsRequirements(item))
+    );
   }
   meetsRequirements(item) {
     if (this.debugMode) {
@@ -2175,52 +2440,24 @@ var ItemStoreService = class {
     }
     return requirements.join(", ");
   }
-  async loadCustomItems() {
-    const folderPath = "QuestLog/StoreInventory";
-    const files = this.plugin.app.vault.getFiles().filter((file) => file.path.startsWith(folderPath) && file.extension === "json");
-    for (const file of files) {
-      try {
-        const content = await this.plugin.app.vault.read(file);
-        const customItems = JSON.parse(content);
-        customItems.forEach((item) => {
-          if (!this.items.find((existingItem) => existingItem.id === item.id)) {
-            this.items.push({
-              ...item,
-              effect: this.createEffectFunction(typeof item.effect === "string" ? item.effect : "")
-            });
-          }
-        });
-      } catch (error) {
-        console.error(`Failed to load custom item from ${file.path}:`, error);
-      }
-    }
-  }
-  createEffectFunction(effect) {
-    try {
-      return new Function("plugin", effect);
-    } catch (error) {
-      console.error("Invalid effect code in JSON:", error);
-      return () => new import_obsidian4.Notice("Error executing custom item effect.");
-    }
-  }
   async purchaseItem(itemId) {
     const item = this.items.find((i) => i.id === itemId);
     if (!item) {
-      new import_obsidian4.Notice("Item not found in the catalogue.");
+      new import_obsidian7.Notice("Item not found in the catalogue.");
       return false;
     }
     if (item.category !== "boost" && item.category !== "ritual") {
       if (this.plugin.statCardData.items.some((items) => items.id === item.id)) {
-        new import_obsidian4.Notice("You already own this artifact.");
+        new import_obsidian7.Notice("You already own this artifact.");
         return false;
       }
     }
     if (this.plugin.statCardData.points < item.cost) {
-      new import_obsidian4.Notice(`Not enough tokens. You need ${item.cost} tokens to purchase this item.`);
+      new import_obsidian7.Notice(`Not enough tokens. You need ${item.cost} tokens to purchase this item.`);
       return false;
     }
     if (!this.meetsRequirements(item)) {
-      new import_obsidian4.Notice(`You do not meet the requirements: ${this.getRequirementText(item)}`);
+      new import_obsidian7.Notice(`You do not meet the requirements: ${this.getRequirementText(item)}`);
       return false;
     }
     this.plugin.statCardData.points -= item.cost;
@@ -2260,7 +2497,7 @@ var ItemStoreService = class {
     return true;
   }
 };
-var ItemStoreModal = class extends import_obsidian4.Modal {
+var ItemStoreModal = class extends import_obsidian7.Modal {
   constructor(app, plugin, storeService) {
     super(app);
     this.selectedCategory = "all";
@@ -2277,22 +2514,17 @@ var ItemStoreModal = class extends import_obsidian4.Modal {
       text: `Available Tokens: ${this.plugin.statCardData.points}`,
       cls: "gamify-points-display"
     });
+    this.renderFilterControls(contentEl);
+    const itemsContainer = contentEl.createDiv({ cls: "gamify-store-items" });
+    itemsContainer.id = "store-items-container";
+    this.renderItems();
+    contentEl.createDiv({ cls: "gamify-store-buttons" });
+  }
+  renderFilterControls(contentEl) {
     const filterContainer = contentEl.createDiv({ cls: "gamify-store-filter" });
-    filterContainer.style.display = "flex";
-    filterContainer.style.alignItems = "center";
-    filterContainer.style.gap = "15px";
-    filterContainer.style.margin = "10px 0";
-    filterContainer.style.padding = "8px 12px";
-    filterContainer.style.backgroundColor = "var(--background-secondary)";
-    filterContainer.style.borderRadius = "6px";
-    const categoryLabel = filterContainer.createSpan({ text: "Category:" });
-    categoryLabel.style.fontSize = "0.9em";
-    categoryLabel.style.fontWeight = "bold";
-    const categoryDropdown = new import_obsidian4.DropdownComponent(filterContainer);
-    categoryDropdown.selectEl.style.minWidth = "120px";
-    categoryDropdown.selectEl.style.height = "28px";
-    categoryDropdown.selectEl.style.padding = "0 8px";
-    categoryDropdown.selectEl.style.marginLeft = "5px";
+    const categoryLabel = filterContainer.createSpan({ text: "Category:", cls: "gamify-filter-label" });
+    const categoryDropdown = new import_obsidian7.DropdownComponent(filterContainer);
+    categoryDropdown.selectEl.addClass("gamify-dropdown");
     categoryDropdown.addOption("all", "All Items");
     categoryDropdown.addOption("boost", "Boosts");
     categoryDropdown.addOption("ritual", "Rituals");
@@ -2303,17 +2535,10 @@ var ItemStoreModal = class extends import_obsidian4.Modal {
       this.selectedCategory = value;
       this.renderItems();
     });
-    const divider = filterContainer.createSpan({ text: "|" });
-    divider.style.color = "var(--text-muted)";
-    divider.style.margin = "0 5px";
-    const sortLabel = filterContainer.createSpan({ text: "Sort by:" });
-    sortLabel.style.fontSize = "0.9em";
-    sortLabel.style.fontWeight = "bold";
-    const sortDropdown = new import_obsidian4.DropdownComponent(filterContainer);
-    sortDropdown.selectEl.style.minWidth = "140px";
-    sortDropdown.selectEl.style.height = "28px";
-    sortDropdown.selectEl.style.padding = "0 8px";
-    sortDropdown.selectEl.style.marginLeft = "5px";
+    const divider = filterContainer.createSpan({ text: "|", cls: "gamify-filter-divider" });
+    const sortLabel = filterContainer.createSpan({ text: "Sort by:", cls: "gamify-filter-label" });
+    const sortDropdown = new import_obsidian7.DropdownComponent(filterContainer);
+    sortDropdown.selectEl.addClass("gamify-dropdown");
     sortDropdown.addOption("default", "Default");
     sortDropdown.addOption("cost_asc", "Cost (Low to High)");
     sortDropdown.addOption("cost_desc", "Cost (High to Low)");
@@ -2324,10 +2549,6 @@ var ItemStoreModal = class extends import_obsidian4.Modal {
       this.sortOption = value;
       this.renderItems();
     });
-    const itemsContainer = contentEl.createDiv({ cls: "gamify-store-items" });
-    itemsContainer.id = "store-items-container";
-    this.renderItems();
-    const buttonContainer = contentEl.createDiv({ cls: "gamify-store-buttons" });
   }
   renderItems() {
     const itemsContainer = document.getElementById("store-items-container");
@@ -2344,63 +2565,59 @@ var ItemStoreModal = class extends import_obsidian4.Modal {
       });
       return;
     }
-    for (const item of items) {
-      const itemEl = itemsContainer.createDiv({ cls: "gamify-store-item" });
-      const itemHeader = itemEl.createDiv({ cls: "gamify-item-header" });
-      itemHeader.createEl("h3", { text: item.name, cls: "gamify-item-title" });
-      itemHeader.createEl("span", {
-        text: `${item.cost} tokens`,
-        cls: "gamify-item-cost"
+    items.forEach((item) => this.renderItemElement(itemsContainer, item));
+  }
+  renderItemElement(container, item) {
+    const itemEl = container.createDiv({ cls: "gamify-store-item" });
+    const itemHeader = itemEl.createDiv({ cls: "gamify-item-header" });
+    itemHeader.createEl("h3", { text: item.name, cls: "gamify-item-title" });
+    itemHeader.createEl("span", {
+      text: `${item.cost} tokens`,
+      cls: "gamify-item-cost"
+    });
+    itemEl.createEl("p", {
+      text: item.description,
+      cls: "gamify-item-description"
+    });
+    const categoryNames = {
+      "boost": "Boost",
+      "ritual": "Ritual",
+      "artifact": "Artifact",
+      "cosmetic": "Cosmetic Upgrade"
+    };
+    itemEl.createEl("span", {
+      text: categoryNames[item.category],
+      cls: `gamify-item-category gamify-category-${item.category}`
+    });
+    this.renderRequirements(itemEl, item);
+    this.renderPurchaseButton(itemEl, item);
+  }
+  renderRequirements(container, item) {
+    const meetsRequirements = this.storeService.meetsRequirements(item);
+    if (!meetsRequirements) {
+      const reqText = this.storeService.getRequirementText(item);
+      const reqLabel = container.createEl("div", {
+        text: reqText,
+        cls: "gamify-item-requirement"
       });
-      itemEl.createEl("p", {
-        text: item.description,
-        cls: "gamify-item-description"
-      });
-      let categoryName = "";
-      switch (item.category) {
-        case "boost":
-          categoryName = "Boost";
-          break;
-        case "ritual":
-          categoryName = "Ritual";
-          break;
-        case "artifact":
-          categoryName = "Artifact";
-          break;
-        case "cosmetic":
-          categoryName = "Cosmetic Upgrade";
-          break;
-      }
-      itemEl.createEl("span", {
-        text: categoryName,
-        cls: `gamify-item-category gamify-category-${item.category}`
-      });
-      const meetsRequirements = this.storeService.meetsRequirements(item);
-      if (!meetsRequirements) {
-        const reqText = this.storeService.getRequirementText(item);
-        const reqLabel = itemEl.createEl("div", {
-          text: reqText,
-          cls: "gamify-item-requirement"
-        });
-        reqLabel.style.color = "crimson";
-        reqLabel.style.fontStyle = "italic";
-        reqLabel.style.margin = "5px 0";
-      }
-      const purchaseButton = new import_obsidian4.ButtonComponent(itemEl).setButtonText(this.plugin.statCardData.items.some((items2) => items2.id === item.id) && (item.category === "artifact" || item.category === "cosmetic") ? "Owned" : "Purchase").onClick(async () => {
-        const success = await this.storeService.purchaseItem(item.id);
-        if (success) {
-          const pointsDisplay = document.querySelector(".gamify-points-display");
-          if (pointsDisplay) {
-            pointsDisplay.textContent = `Available Tokens: ${this.plugin.statCardData.points}`;
-          }
-          if (item.category === "artifact" || item.category === "cosmetic") {
-            this.renderItems();
-          }
+    }
+  }
+  renderPurchaseButton(container, item) {
+    const isOwned = this.plugin.statCardData.items.some((i) => i.id === item.id) && (item.category === "artifact" || item.category === "cosmetic");
+    const purchaseButton = new import_obsidian7.ButtonComponent(container).setButtonText(isOwned ? "Owned" : "Purchase").onClick(async () => {
+      const success = await this.storeService.purchaseItem(item.id);
+      if (success) {
+        const pointsDisplay = document.querySelector(".gamify-points-display");
+        if (pointsDisplay) {
+          pointsDisplay.textContent = `Available Tokens: ${this.plugin.statCardData.points}`;
         }
-      });
-      if (this.plugin.statCardData.items.some((items2) => items2.id === item.id) && (item.category === "artifact" || item.category === "cosmetic")) {
-        purchaseButton.setDisabled(true);
+        if (item.category === "artifact" || item.category === "cosmetic") {
+          this.renderItems();
+        }
       }
+    });
+    if (isOwned) {
+      purchaseButton.setDisabled(true);
     }
   }
   sortItems(items) {
@@ -2423,56 +2640,147 @@ var ItemStoreModal = class extends import_obsidian4.Modal {
   }
 };
 
-// indicator.ts
-var import_obsidian5 = require("obsidian");
-var processingIcon = `<svg width="100%" height="100%" viewBox="0 0 24 24">
-  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="50 50">
-    <animateTransform attributeName="transform" type="rotate" dur="1s" from="0 12 12" to="360 12 12" repeatCount="indefinite"/>
-  </circle>
-</svg>`;
+// support/indicator.ts
+var import_obsidian8 = require("obsidian");
 var ProcessingIndicatorService = class {
   constructor(plugin) {
-    this.ribbonIcon = null;
+    this.statusBarItem = null;
+    this.ribbonIconEl = null;
     this.isProcessing = false;
-    this.taskCount = 0;
+    this.animationInterval = null;
+    this.dots = 0;
+    this.processingType = null;
     this.plugin = plugin;
-    (0, import_obsidian5.addIcon)("processing-status", processingIcon);
+    this.initializeIcons();
+    this.createStatusBarItem();
   }
-  initializeUI() {
-    this.ribbonIcon = this.plugin.addRibbonIcon("processing-status", "Processing Tasks", () => {
-      new import_obsidian5.Notice(`${this.taskCount} tasks currently processing`);
+  initializeIcons() {
+    (0, import_obsidian8.addIcon)("processing-indicator", `<svg viewBox="0 0 100 100" width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
+                <animate attributeName="stroke-dasharray" from="0 283" to="283 0" dur="1.5s" repeatCount="indefinite"/>
+                <animate attributeName="stroke-dashoffset" from="0" to="-283" dur="1.5s" repeatCount="indefinite"/>
+            </circle>
+        </svg>`);
+  }
+  createStatusBarItem() {
+    this.statusBarItem = this.plugin.addStatusBarItem();
+    this.statusBarItem.addClass("processing-indicator-status");
+    this.statusBarItem.style.display = "none";
+  }
+  createRibbonIcon() {
+    this.ribbonIconEl = this.plugin.addRibbonIcon("processing-indicator", "Processing", () => {
+      return;
     });
-    this.hideIndicator();
+    this.ribbonIconEl.addClass("processing-indicator-ribbon");
   }
-  startProcessing(taskType = "task") {
-    this.taskCount++;
-    if (this.ribbonIcon && !this.isProcessing) {
-      this.ribbonIcon.style.display = "flex";
-      this.isProcessing = true;
+  startProcessing(type = "default") {
+    this.isProcessing = true;
+    this.processingType = type;
+    this.dots = 0;
+    if (this.plugin.settings.useStatusBarIndicator !== false) {
+      this.showStatusBarIndicator();
+    }
+    if (this.plugin.settings.useRibbonIndicator !== false) {
+      this.createRibbonIcon();
+      this.showRibbonIndicator();
+    }
+    if (this.animationInterval === null) {
+      this.animationInterval = window.setInterval(() => {
+        this.updateAnimation();
+      }, 500);
+    }
+  }
+  showStatusBarIndicator() {
+    if (!this.statusBarItem) return;
+    const theme = this.plugin.themeService.getCurrentTheme();
+    const label = this.getProcessingLabel(theme);
+    this.statusBarItem.setText(label);
+    this.statusBarItem.style.display = "block";
+  }
+  showRibbonIndicator() {
+    if (!this.ribbonIconEl) return;
+    this.ribbonIconEl.style.display = "block";
+    this.ribbonIconEl.setAttribute("aria-label", this.getProcessingText());
+  }
+  getProcessingLabel(theme) {
+    var _a;
+    let baseText = "";
+    if (this.processingType === "llm") {
+      baseText = ((_a = theme == null ? void 0 : theme.flavor) == null ? void 0 : _a.processingMessage) || "Consulting the powers";
+    } else {
+      baseText = "Processing";
+    }
+    return baseText + ".".repeat(this.dots);
+  }
+  getProcessingText() {
+    if (this.processingType === "llm") {
+      return "Consulting mystical powers...";
+    }
+    return "Processing...";
+  }
+  updateAnimation() {
+    if (!this.isProcessing) return;
+    const theme = this.plugin.themeService.getCurrentTheme();
+    this.dots = (this.dots + 1) % 4;
+    if (this.statusBarItem && this.plugin.settings.useStatusBarIndicator !== false) {
+      this.statusBarItem.setText(this.getProcessingLabel(theme));
+    }
+    if (this.ribbonIconEl && this.plugin.settings.useRibbonIndicator !== false && this.isProcessing) {
+      const rotation = Date.now() / 10 % 360;
+      this.ribbonIconEl.style.transform = `rotate(${rotation}deg)`;
     }
   }
   endProcessing() {
-    this.taskCount = Math.max(0, this.taskCount - 1);
-    if (this.ribbonIcon && this.taskCount === 0) {
-      this.hideIndicator();
+    this.isProcessing = false;
+    this.processingType = null;
+    if (this.animationInterval !== null) {
+      window.clearInterval(this.animationInterval);
+      this.animationInterval = null;
+    }
+    if (this.statusBarItem) {
+      this.statusBarItem.style.display = "none";
+    }
+    if (this.ribbonIconEl) {
+      this.ribbonIconEl.remove();
+      this.ribbonIconEl = null;
     }
   }
-  hideIndicator() {
-    if (this.ribbonIcon) {
-      this.ribbonIcon.style.display = "none";
-      this.isProcessing = false;
+  destroy() {
+    this.endProcessing();
+    if (this.statusBarItem) {
+      this.statusBarItem.remove();
+      this.statusBarItem = null;
     }
   }
 };
 
-// inventory.ts
-var import_obsidian6 = require("obsidian");
-var InventoryTabView = class extends import_obsidian6.ItemView {
+// views/inventory.ts
+var import_obsidian9 = require("obsidian");
+var RARITY = {
+  LEGENDARY: ["system_control", "infinite_inventory", "debugger"],
+  UNIQUE: ["ring_of_power", "familiar"],
+  RARE: ["sword", "shield", "magic_scroll", "helmet", "armor"]
+};
+var ICON_MAP = {
+  "infinite_inventory": "backpack",
+  "potion": "droplet",
+  "sword": "sword",
+  "shield": "shield",
+  "gold_coin": "coins",
+  "magic_scroll": "scroll",
+  "helmet": "helmet",
+  "armor": "vest",
+  "ring_of_power": "gem",
+  "system_control": "key",
+  "debugger": "bug",
+  "familiar": "cat",
+  "store_app": "credit-card"
+};
+var DEFAULT_ICONS = ["star", "circle", "cube", "package", "box", "bookmark"];
+var InventoryTabView = class extends import_obsidian9.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
-    this.draggedItem = null;
-    this.draggedItemOriginalPos = null;
   }
   getViewType() {
     return "inventory-view";
@@ -2488,6 +2796,18 @@ var InventoryTabView = class extends import_obsidian6.ItemView {
   }
   async onOpen() {
     this.containerEl = this.contentEl.createDiv({ cls: "inventory-container" });
+    this.createHeader();
+    this.inventoryGrid = this.containerEl.createDiv({ cls: "inventory-grid" });
+    this.detailsEl = this.containerEl.createDiv({ cls: "inventory-details" });
+    this.plugin.registerEvent(
+      this.plugin.app.workspace.on("layout-change", () => {
+        this.renderInventory();
+        this.updateTitle();
+      })
+    );
+    this.renderInventory();
+  }
+  createHeader() {
     const headerEl = this.containerEl.createDiv({ cls: "inventory-header" });
     headerEl.createEl("h3", { text: this.plugin.themeService.getThemedTerm("inventory", "Inventory") });
     const controlsEl = headerEl.createDiv({ cls: "inventory-controls" });
@@ -2497,20 +2817,6 @@ var InventoryTabView = class extends import_obsidian6.ItemView {
       cls: "inventory-search"
     });
     searchEl.addEventListener("input", () => this.filterItems(searchEl.value));
-    const storeButton = new import_obsidian6.ButtonComponent(controlsEl).setButtonText(this.plugin.themeService.getThemedTerm("storeButton", "StoreButton")).onClick(() => {
-      new ItemStoreModal(this.app, this.plugin, this.plugin.itemStoreService).open();
-    });
-    storeButton.buttonEl.addClass("gamify-store-button");
-    this.inventoryGrid = this.containerEl.createDiv({ cls: "inventory-grid" });
-    const detailsEl = this.containerEl.createDiv({ cls: "inventory-details" });
-    detailsEl.style.display = "none";
-    this.plugin.registerEvent(
-      this.plugin.app.workspace.on("layout-change", () => {
-        this.renderInventory();
-        this.updateTitle();
-      })
-    );
-    this.renderInventory();
   }
   updateTitle() {
     const headerEl = this.containerEl.querySelector(".inventory-header h3");
@@ -2520,7 +2826,18 @@ var InventoryTabView = class extends import_obsidian6.ItemView {
   }
   renderInventory() {
     this.inventoryGrid.empty();
-    const items = Array.isArray(this.plugin.statCardData.items) ? this.plugin.statCardData.items.map((item) => {
+    const items = this.getInventoryItems();
+    if (items.length === 0) {
+      this.renderEmptyInventory();
+      return;
+    }
+    this.renderInventoryGrid(items);
+  }
+  getInventoryItems() {
+    if (!Array.isArray(this.plugin.statCardData.items)) {
+      return [];
+    }
+    return this.plugin.statCardData.items.map((item) => {
       if (typeof item === "string") {
         return {
           id: item,
@@ -2533,17 +2850,19 @@ var InventoryTabView = class extends import_obsidian6.ItemView {
           id: item.id,
           name: item.name,
           description: item.description,
-          icon: this.getIconForItem(item.id)
+          icon: this.getIconForItem(item.id),
+          effect: item.effect
         };
       }
-    }) : [];
-    if (items.length === 0) {
-      this.inventoryGrid.createEl("p", {
-        text: "Your inventory is empty. Complete tasks to earn points and purchase items!",
-        cls: "inventory-empty"
-      });
-      return;
-    }
+    });
+  }
+  renderEmptyInventory() {
+    this.inventoryGrid.createEl("p", {
+      text: "Your inventory is empty. Complete tasks to earn points and purchase items!",
+      cls: "inventory-empty"
+    });
+  }
+  renderInventoryGrid(items) {
     const rows = Math.max(4, Math.ceil(items.length / 6));
     const cols = 6;
     const assigned = /* @__PURE__ */ new Set();
@@ -2561,65 +2880,48 @@ var InventoryTabView = class extends import_obsidian6.ItemView {
   }
   findItemForPosition(items, row, col, assigned) {
     const storedPositions = this.plugin.settings.inventoryPositions || {};
-    for (const item of items) {
-      if (!assigned.has(item.id)) {
-        const pos = storedPositions[item.id];
-        if (pos && pos.row === row && pos.col === col) {
-          assigned.add(item.id);
-          return {
-            id: item.id,
-            name: item.name,
-            description: item.description,
-            icon: this.getIconForItem(item.id),
-            position: { row, col }
-          };
-        }
-      }
+    const positionedItem = items.find(
+      (item) => !assigned.has(item.id) && storedPositions[item.id] && storedPositions[item.id].row === row && storedPositions[item.id].col === col
+    );
+    if (positionedItem) {
+      assigned.add(positionedItem.id);
+      return {
+        ...positionedItem,
+        position: { row, col }
+      };
     }
-    for (const item of items) {
-      if (!assigned.has(item.id)) {
-        assigned.add(item.id);
-        return {
-          id: item.id,
-          name: item.name,
-          description: item.description,
-          icon: this.getIconForItem(item.id),
-          position: { row, col }
-        };
-      }
+    const unassignedItem = items.find((item) => !assigned.has(item.id));
+    if (unassignedItem) {
+      assigned.add(unassignedItem.id);
+      return {
+        ...unassignedItem,
+        position: { row, col }
+      };
     }
     return null;
   }
   createItemElement(slotEl, item) {
     const itemEl = slotEl.createDiv({ cls: "inventory-item gamify-inventory-item" });
     itemEl.dataset.id = item.id;
-    itemEl.style.display = "flex";
-    itemEl.style.flexDirection = "column";
-    itemEl.style.alignItems = "center";
-    itemEl.style.justifyContent = "center";
-    itemEl.style.padding = "4px";
-    itemEl.style.height = "100%";
-    itemEl.style.width = "100%";
     const rarityClass = this.getItemRarityClass(item.id);
     if (rarityClass) {
       itemEl.addClass(rarityClass);
     }
-    const iconEl = itemEl.createDiv({ cls: "item-icon" });
-    iconEl.style.fontSize = "32px";
-    iconEl.style.marginBottom = "4px";
-    try {
-      (0, import_obsidian6.setIcon)(iconEl, item.icon);
-    } catch (e) {
-      (0, import_obsidian6.setIcon)(iconEl, "circle");
-    }
-    const nameEl = itemEl.createDiv({ cls: "item-name", text: item.name });
-    nameEl.style.fontSize = "10px";
-    nameEl.style.textAlign = "center";
-    nameEl.style.whiteSpace = "normal";
-    nameEl.style.wordBreak = "break-word";
-    nameEl.style.textTransform = "capitalize";
-    itemEl.setAttribute("title", item.description);
+    this.createItemIcon(itemEl, item);
+    this.createItemName(itemEl, item);
     itemEl.addEventListener("click", () => this.handleItemClick(item));
+  }
+  createItemIcon(itemEl, item) {
+    const iconEl = itemEl.createDiv({ cls: "item-icon" });
+    try {
+      (0, import_obsidian9.setIcon)(iconEl, item.icon);
+    } catch (e) {
+      (0, import_obsidian9.setIcon)(iconEl, "circle");
+    }
+  }
+  createItemName(itemEl, item) {
+    const nameEl = itemEl.createDiv({ cls: "item-name", text: item.name });
+    itemEl.setAttribute("title", item.description);
   }
   handleItemClick(item) {
     if (item.id === "infinite_inventory") {
@@ -2630,20 +2932,29 @@ var InventoryTabView = class extends import_obsidian6.ItemView {
       new RedeemTaskModal(this.plugin.app, this.plugin).open();
       return;
     }
-    if (item.effect && item.effect.includes("Set theme.")) {
-      const themeId = item.id.replace("_theme", "");
-      this.plugin.themeService.switchTheme(themeId);
-      new StatCardModal(this.app, this.plugin).open();
+    if (item.id === "store_app") {
+      new ItemStoreModal(this.app, this.plugin, this.plugin.itemStoreService).open();
       return;
     }
     if (item.effect) {
+      if (item.effect.includes("Set theme.")) {
+        const themeId = item.id.replace("_theme", "");
+        this.plugin.themeService.switchTheme(themeId);
+        new StatCardModal(this.app, this.plugin).open();
+        const existingLeaves = this.app.workspace.getLeavesOfType("inventory-view");
+        if (existingLeaves.length > 0) {
+          existingLeaves[0].detach();
+          this.plugin.activateInventoryTab();
+        }
+        return;
+      }
       try {
-        const effectFunction = this.createEffectFunction(typeof item.effect === "string" ? item.effect : "");
+        const effectFunction = this.createEffectFunction(item.effect);
         effectFunction(this.plugin);
-        new import_obsidian6.Notice(`Activated: ${item.name}`);
+        new import_obsidian9.Notice(`Activated: ${item.name}`);
       } catch (error) {
         console.error("Error executing item effect:", error);
-        new import_obsidian6.Notice("Error activating item effect.");
+        new import_obsidian9.Notice("Error activating item effect.");
       }
     }
   }
@@ -2651,19 +2962,16 @@ var InventoryTabView = class extends import_obsidian6.ItemView {
     try {
       return new Function("plugin", effect);
     } catch (error) {
-      console.error("Invalid effect code in JSON:", error);
-      return () => new import_obsidian6.Notice("Error executing item effect.");
+      console.error("Invalid effect code:", error);
+      return () => new import_obsidian9.Notice("Error executing item effect.");
     }
   }
   getItemRarityClass(itemId) {
-    const legendaryItems = ["system_control", "infinite_inventory", "debugger"];
-    const uniqueItems = ["ring_of_power", "familiar"];
-    const rareItems = ["sword", "shield", "magic_scroll", "helmet", "armor"];
-    if (legendaryItems.includes(itemId)) {
+    if (RARITY.LEGENDARY.includes(itemId)) {
       return "legendary-item";
-    } else if (uniqueItems.includes(itemId) || itemId.includes("_theme")) {
+    } else if (RARITY.UNIQUE.includes(itemId) || itemId.includes("_theme")) {
       return "unique-item";
-    } else if (rareItems.includes(itemId)) {
+    } else if (RARITY.RARE.includes(itemId)) {
       return "rare-item";
     } else {
       return "common-item";
@@ -2673,45 +2981,1250 @@ var InventoryTabView = class extends import_obsidian6.ItemView {
     if (itemId.includes("_theme")) {
       return "book";
     }
-    const iconMap = {
-      "infinite_inventory": "infinity",
-      "mana_potion": "droplet",
-      "sword": "sword",
-      "shield": "shield",
-      "gold_coin": "coins",
-      "magic_scroll": "scroll",
-      "helmet": "helmet",
-      "armor": "vest",
-      "ring_of_power": "gem",
-      "boots": "footprints",
-      "system_control": "key",
-      "debugger": "bug",
-      "familiar": "cat",
-      "grimoire_theme": "book"
-    };
-    if (iconMap[itemId]) {
-      return iconMap[itemId];
-    }
-    const defaultIcons = ["star", "circle", "cube", "package", "box", "bookmark"];
-    const fallbackIcon = defaultIcons[itemId.length % defaultIcons.length];
-    return fallbackIcon;
+    return ICON_MAP[itemId] || DEFAULT_ICONS[itemId.length % DEFAULT_ICONS.length];
   }
   filterItems(query) {
-    const items = this.inventoryGrid.querySelectorAll(".inventory-item");
+    const items = this.inventoryGrid.querySelectorAll("inventory-item");
     query = query.toLowerCase();
     items.forEach((item) => {
       var _a;
       const itemEl = item;
-      const nameEl = itemEl.querySelector(".item-name");
+      const nameEl = itemEl.querySelector("item-name");
       const name = nameEl ? ((_a = nameEl.textContent) == null ? void 0 : _a.toLowerCase()) || "" : "";
-      if (name.includes(query)) {
-        itemEl.style.display = "flex";
-      } else {
-        itemEl.style.display = "none";
-      }
     });
   }
   async onClose() {
+  }
+};
+
+// debug/DebugMenu.ts
+var import_obsidian10 = require("obsidian");
+var DebugMenu = class extends import_obsidian10.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "Debug Menu" });
+    this.createStatsSection(contentEl);
+    this.createSkillsSection(contentEl);
+    this.createItemsSection(contentEl);
+    this.createStatsManipulationSection(contentEl);
+    this.createTitlesSection(contentEl);
+    this.createDebugTools(contentEl);
+    const saveBtn = contentEl.createEl("button", {
+      text: "Save All Changes",
+      cls: "mod-cta debug-button"
+    });
+    saveBtn.addEventListener("click", async () => {
+      await this.plugin.saveStatCardData();
+      new import_obsidian10.Notice("Debug changes saved successfully!");
+      this.close();
+    });
+  }
+  createStatsSection(parent) {
+    const section = parent.createDiv("debug-section");
+    section.createEl("h3", { text: "Core Stats" });
+    this.createStatControl(section, "XP", () => this.plugin.statCardData.xp, (val) => {
+      this.plugin.statCardData.xp = val;
+      this.plugin.checkForLevelUp();
+    });
+    this.createStatControl(section, "Level", () => this.plugin.statCardData.level, (val) => {
+      this.plugin.statCardData.level = val;
+      this.plugin.statCardData.nextLevelXp = Math.round(100 * Math.pow(1.1 + val * 0.05, val - 1));
+    });
+    this.createStatControl(section, "Points", () => this.plugin.statCardData.points, (val) => {
+      this.plugin.statCardData.points = val;
+    });
+  }
+  createSkillsSection(parent) {
+    const section = parent.createDiv("debug-section");
+    section.createEl("h3", { text: "Skills" });
+    const skillSelector = section.createEl("select");
+    this.plugin.statCardData.skills.forEach((skill) => {
+      const option = skillSelector.createEl("option");
+      option.value = skill.id;
+      option.text = skill.name;
+    });
+    const selectedSkillDiv = section.createDiv("selected-skill-controls");
+    const updateSelectedSkillControls = () => {
+      const selectedSkillId = skillSelector.value;
+      const selectedSkill = this.plugin.statCardData.skills.find((s) => s.id === selectedSkillId);
+      if (!selectedSkill) return;
+      selectedSkillDiv.empty();
+      this.createStatControl(selectedSkillDiv, "Skill Level", () => selectedSkill.level, (val) => selectedSkill.level = val);
+      this.createStatControl(selectedSkillDiv, "Skill XP", () => selectedSkill.xp, (val) => selectedSkill.xp = val);
+    };
+    skillSelector.addEventListener("change", updateSelectedSkillControls);
+    updateSelectedSkillControls();
+  }
+  createItemsSection(parent) {
+    const section = parent.createDiv("debug-section");
+    section.createEl("h3", { text: "Owned Items" });
+    const itemInputContainer = section.createDiv("item-input-container");
+    const itemInput = itemInputContainer.createEl("input", {
+      type: "text",
+      placeholder: "Enter item id to add"
+    });
+    const addItemButton = itemInputContainer.createEl("button", { text: "Add Item", cls: "debug-button" });
+    addItemButton.addEventListener("click", () => {
+      const itemId = itemInput.value.trim();
+      if (itemId && !this.plugin.statCardData.ownedItems.includes(itemId)) {
+        this.plugin.statCardData.ownedItems.push(itemId);
+        this.renderOwnedItems(itemsListDiv);
+        itemInput.value = "";
+      }
+    });
+    const itemsListDiv = section.createDiv("items-list");
+    this.renderOwnedItems(itemsListDiv);
+  }
+  createStatsManipulationSection(parent) {
+    const section = parent.createDiv("debug-section");
+    section.createEl("h3", { text: "Stats & Counters" });
+    this.createStatControl(section, "Tasks Completed", () => this.plugin.statCardData.stats.tasksCompleted, (val) => this.plugin.statCardData.stats.tasksCompleted = val);
+    this.createStatControl(section, "Total Points Earned", () => this.plugin.statCardData.stats.totalPointsEarned, (val) => this.plugin.statCardData.stats.totalPointsEarned = val);
+  }
+  createTitlesSection(parent) {
+    const section = parent.createDiv("debug-section");
+    section.createEl("h3", { text: "Manage Titles" });
+    const titleIdInput = section.createEl("input", { type: "text", placeholder: "Enter Title ID" });
+    const titleNameInput = section.createEl("input", { type: "text", placeholder: "Enter Title Name" });
+    const titleDescInput = section.createEl("input", { type: "text", placeholder: "Enter Title Description" });
+    const addTitleButton = section.createEl("button", { text: "Add Title", cls: "debug-button" });
+    addTitleButton.addEventListener("click", () => {
+      const id = titleIdInput.value.trim();
+      const name = titleNameInput.value.trim();
+      const description = titleDescInput.value.trim();
+      if (!id || !name || !description) {
+        new import_obsidian10.Notice("Please fill in all fields before adding a title.");
+        return;
+      }
+      if (this.plugin.statCardData.titles.some((title) => title.id === id)) {
+        new import_obsidian10.Notice(`Title "${name}" already exists.`);
+        return;
+      }
+      const newTitle = {
+        id,
+        name,
+        description,
+        unlockedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        effect: []
+      };
+      this.plugin.statCardData.titles.push(newTitle);
+      this.renderTitlesList(titlesListDiv);
+      titleIdInput.value = "";
+      titleNameInput.value = "";
+      titleDescInput.value = "";
+    });
+    const titlesListDiv = section.createDiv("titles-list");
+    this.renderTitlesList(titlesListDiv);
+  }
+  createDebugTools(parent) {
+    const section = parent.createDiv("debug-section");
+    section.createEl("h3", { text: "Debug Tools" });
+    const forceSaveBtn = section.createEl("button", { text: "Force Save Data", cls: "debug-button" });
+    forceSaveBtn.addEventListener("click", async () => {
+      await this.plugin.saveStatCardData();
+      new import_obsidian10.Notice("Data force-saved successfully");
+    });
+  }
+  createStatControl(containerEl, label, getValue, setValue) {
+    const controlDiv = containerEl.createDiv("stat-control");
+    const labelEl = controlDiv.createEl("span", { text: label, cls: "stat-label" });
+    const buttonContainer = controlDiv.createDiv("stat-button-container");
+    const buttons = [
+      { text: "-10", change: -10, cls: "decrease-button" },
+      { text: "-1", change: -1, cls: "decrease-button" },
+      { text: "+1", change: 1, cls: "increase-button" },
+      { text: "+10", change: 10, cls: "increase-button" }
+    ];
+    const leftButtonGroup = buttonContainer.createDiv("stat-button-group");
+    buttons.slice(0, 2).forEach(({ text, change, cls }) => {
+      const btn = leftButtonGroup.createEl("button", { text, cls: `debug-button ${cls}` });
+      btn.addEventListener("click", () => {
+        const newVal = Math.max(0, getValue() + change);
+        setValue(newVal);
+        valueSpan.textContent = `${newVal}`;
+      });
+    });
+    const valueSpan = buttonContainer.createEl("span", { text: `${getValue()}`, cls: "stat-value" });
+    const rightButtonGroup = buttonContainer.createDiv("stat-button-group");
+    buttons.slice(2).forEach(({ text, change, cls }) => {
+      const btn = rightButtonGroup.createEl("button", { text, cls: `debug-button ${cls}` });
+      btn.addEventListener("click", () => {
+        const newVal = Math.max(0, getValue() + change);
+        setValue(newVal);
+        valueSpan.textContent = `${newVal}`;
+      });
+    });
+  }
+  renderOwnedItems(containerEl) {
+    containerEl.empty();
+    this.plugin.statCardData.ownedItems.forEach((itemId) => {
+      const div = containerEl.createDiv("owned-item");
+      div.createEl("span", { text: itemId });
+      const removeBtn = div.createEl("button", { text: "Remove", cls: "debug-button" });
+      removeBtn.addEventListener("click", () => {
+        this.plugin.statCardData.ownedItems = this.plugin.statCardData.ownedItems.filter((id) => id !== itemId);
+        this.renderOwnedItems(containerEl);
+      });
+    });
+  }
+  renderTitlesList(containerEl) {
+    containerEl.empty();
+    if (this.plugin.statCardData.titles.length === 0) {
+      containerEl.createEl("p", { text: "No titles unlocked yet.", cls: "debug-empty-message" });
+      return;
+    }
+    this.plugin.statCardData.titles.forEach((title) => {
+      const titleDiv = containerEl.createDiv("title-item");
+      titleDiv.createEl("h4", { text: title.name });
+      titleDiv.createEl("p", { text: title.description, cls: "title-description" });
+      const unlockDate = new Date(title.unlockedAt).toLocaleDateString();
+      titleDiv.createEl("p", { text: `Unlocked on: ${unlockDate}`, cls: "title-unlock-date" });
+      if (title.effect.length > 0) {
+        const effectsList = titleDiv.createEl("ul", { cls: "title-effects-list" });
+        title.effect.forEach((effect) => {
+          effectsList.createEl("li", { text: effect });
+        });
+      }
+      const removeBtn = titleDiv.createEl("button", { text: "Remove", cls: "debug-button" });
+      removeBtn.addEventListener("click", () => {
+        this.plugin.statCardData.titles = this.plugin.statCardData.titles.filter((t) => t.id !== title.id);
+        this.renderTitlesList(containerEl);
+      });
+      titleDiv.appendChild(removeBtn);
+    });
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+
+// settings/settings-tab.ts
+var import_obsidian12 = require("obsidian");
+
+// support/notificationListener.ts
+var import_obsidian11 = require("obsidian");
+var NotificationModal = class extends import_obsidian11.Modal {
+  constructor(app, notificationListener) {
+    super(app);
+    this.notificationListener = notificationListener;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    this.createNotificationViewer(contentEl);
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+  createNotificationViewer(containerEl) {
+    containerEl.empty();
+    containerEl.createEl("h2", { text: "Notification History" });
+    const notifications = this.notificationListener.getNotifications();
+    const notificationContainer = containerEl.createEl("div", { cls: "notification-container" });
+    if (notifications.length === 0) {
+      notificationContainer.createEl("p", {
+        text: "No notifications have been captured yet.",
+        cls: "no-notifications"
+      });
+      return;
+    }
+    notifications.forEach((notification) => {
+      const card = notificationContainer.createEl("div", { cls: "notification-card" });
+      card.createEl("div", {
+        text: notification.text,
+        cls: "notification-message"
+      });
+      card.createEl("div", {
+        text: notification.timestamp,
+        cls: "notification-timestamp"
+      });
+    });
+  }
+};
+var NotificationListener = class {
+  constructor(plugin, settings) {
+    this.observers = [];
+    this.storedNotifications = [];
+    this.plugin = plugin;
+    this.settings = settings;
+    this.app = plugin.app;
+  }
+  initialize() {
+    const parent = document.querySelector("body");
+    this.startObserving(parent, "notice");
+  }
+  cleanup() {
+    this.observers.forEach((obs) => {
+      obs.disconnect();
+    });
+    this.observers = [];
+  }
+  startObserving(domNode, classToLookFor) {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        const elementAdded = Array.from(mutation.addedNodes).some(
+          (element) => {
+            if (element.classList) {
+              return element.classList.contains(classToLookFor);
+            }
+            return false;
+          }
+        );
+        if (elementAdded && this.settings.enableNotificationCapture) {
+          mutation.addedNodes.forEach((notice) => {
+            var _a;
+            if ((_a = notice.classList) == null ? void 0 : _a.contains(classToLookFor)) {
+              this.captureNotification(notice.textContent || "");
+            }
+          });
+        }
+      });
+    });
+    observer.observe(domNode, {
+      childList: true,
+      attributes: false,
+      characterData: false,
+      subtree: true
+    });
+    this.observers.push(observer);
+  }
+  captureNotification(text) {
+    if (!text || /^\d+$/.test(text.trim())) {
+      return;
+    }
+    const messagesToIgnore = [
+      "Scan complete! No new completed tasks found.",
+      "Manual scan started.",
+      "0 tasks currently processing",
+      "Connection successful!"
+    ];
+    if (messagesToIgnore.includes(text.trim())) {
+      return;
+    }
+    const notification = {
+      text,
+      timestamp: (0, import_obsidian11.moment)().format("YYYY-MM-DD HH:mm:ss")
+    };
+    this.storedNotifications.unshift(notification);
+    if (this.storedNotifications.length > this.settings.maxNotificationsToStore) {
+      this.storedNotifications = this.storedNotifications.slice(
+        0,
+        this.settings.maxNotificationsToStore
+      );
+    }
+    this.saveNotifications();
+  }
+  async saveNotifications() {
+    const existingData = await this.plugin.loadData() || {};
+    await this.plugin.saveData({
+      ...existingData,
+      notifications: this.storedNotifications
+    });
+  }
+  async loadNotifications() {
+    const data = await this.plugin.loadData();
+    this.storedNotifications = (data == null ? void 0 : data.notifications) || [];
+  }
+  getNotifications() {
+    return this.storedNotifications;
+  }
+  clearNotifications() {
+    this.storedNotifications = [];
+    this.saveNotifications();
+  }
+  getLastNotifications(count) {
+    return this.storedNotifications.slice(0, count);
+  }
+  openNotificationModal() {
+    new NotificationModal(this.app, this).open();
+  }
+};
+function addNotificationSettingsUI(containerEl, plugin, notificationListener, settings, saveSettings) {
+  new import_obsidian11.Setting(containerEl).setName("Enable notification capture").setDesc("Capture and store notifications for later viewing").addToggle((toggle) => toggle.setValue(settings.enableNotificationCapture).onChange(async (value) => {
+    settings.enableNotificationCapture = value;
+    await saveSettings();
+  }));
+  new import_obsidian11.Setting(containerEl).setName("Maximum notifications to store").setDesc("Set the number of most recent notifications to keep").addSlider((slider) => slider.setLimits(10, 500, 10).setValue(settings.maxNotificationsToStore).setDynamicTooltip().onChange(async (value) => {
+    settings.maxNotificationsToStore = value;
+    await saveSettings();
+  }));
+  new import_obsidian11.Setting(containerEl).setName("View notification history").setDesc("Open a window showing all captured notifications").addButton((button) => button.setButtonText("View History").onClick(() => {
+    notificationListener.openNotificationModal();
+  }));
+  new import_obsidian11.Setting(containerEl).setName("Clear stored notifications").setDesc("Remove all currently stored notifications").addButton((button) => button.setButtonText("Clear").onClick(() => {
+    notificationListener.clearNotifications();
+    new import_obsidian11.Notice("Notification history cleared");
+  }));
+}
+
+// settings/settings-tab.ts
+var GamifySettingTab = class extends import_obsidian12.PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+    this.achievementsService = this.plugin.achievementsService;
+  }
+  hasSystemControlAccess() {
+    return this.plugin.statCardData.ownedItems && this.plugin.statCardData.ownedItems.includes("system_control");
+  }
+  hasTagAccess() {
+    return this.plugin.statCardData.ownedItems && this.plugin.statCardData.ownedItems.includes("tagger");
+  }
+  async display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    new import_obsidian12.Setting(containerEl).setName("Tracked Notes").setHeading();
+    const trackedNotesContainer = containerEl.createDiv();
+    if (this.plugin.settings.trackedNotes.length === 0) {
+      trackedNotesContainer.createEl("p", {
+        text: 'No notes are currently being tracked. Use the "Track Current Note for Tasks" command to start tracking notes.'
+      });
+    } else {
+      const ul = trackedNotesContainer.createEl("ul", { cls: "gamify-tracked-notes" });
+      this.plugin.settings.trackedNotes.forEach((path) => {
+        const li = ul.createEl("li", { cls: "gamify-tracked-note" });
+        li.createEl("span", { text: path });
+        const removeButton = li.createEl("button", {
+          text: "Remove",
+          cls: "gamify-remove-button"
+        });
+        removeButton.addEventListener("click", async () => {
+          this.plugin.settings.trackedNotes = this.plugin.settings.trackedNotes.filter((p) => p !== path);
+          await this.plugin.saveSettings();
+          this.display();
+        });
+      });
+    }
+    new import_obsidian12.Setting(containerEl).setName("XP/Point Modifier").setHeading();
+    if (!this.hasSystemControlAccess()) {
+      const notice = containerEl.createEl("div", {
+        cls: "setting-item-description",
+        text: "You do not have permission to modify this settings."
+      });
+    }
+    new import_obsidian12.Setting(containerEl).setName("XP per character").setDesc("How much XP is earned for each character typed.").addText((text) => {
+      text.setValue(this.plugin.settings.xpPerCharacter.toString());
+      if (!this.hasSystemControlAccess()) {
+        text.setDisabled(true);
+        text.inputEl.title = "Permission Required.";
+      } else {
+        text.onChange(async (value) => {
+          this.plugin.settings.xpPerCharacter = parseFloat(value) || 0.1;
+          await this.plugin.saveSettings();
+        });
+      }
+    });
+    new import_obsidian12.Setting(containerEl).setName("Base points value").setDesc("Base points awarded for completing a task.").addText((text) => {
+      text.setValue(this.plugin.settings.pointsBaseValue.toString());
+      if (!this.hasSystemControlAccess()) {
+        text.setDisabled(true);
+        text.inputEl.title = "Permission Required.";
+      } else {
+        text.onChange(async (value) => {
+          this.plugin.settings.pointsBaseValue = parseInt(value) || 10;
+          await this.plugin.saveSettings();
+        });
+      }
+    });
+    new import_obsidian12.Setting(containerEl).setName("Tag Multipliers").setHeading();
+    if (!(this.hasSystemControlAccess() || this.hasTagAccess())) {
+      const notice = containerEl.createEl("div", {
+        cls: "setting-item-description",
+        text: "You do not have permission to modify this settings."
+      });
+    }
+    Object.entries(this.plugin.settings.tagMultipliers).forEach(([tag, multiplier]) => {
+      const setting = new import_obsidian12.Setting(containerEl).setName(`Multiplier for ${tag}`).setDesc(`Multiplier for tasks with the ${tag} tag.`).addText((text) => {
+        text.setValue(multiplier.toString());
+        if (!(this.hasSystemControlAccess() || this.hasTagAccess())) {
+          text.setDisabled(true);
+          text.inputEl.title = "Permission Required.";
+        } else {
+          text.onChange(async (value) => {
+            this.plugin.settings.tagMultipliers[tag] = parseFloat(value) || 1;
+            await this.plugin.saveSettings();
+          });
+        }
+      });
+      if (this.hasSystemControlAccess() || !this.hasTagAccess()) {
+        setting.addButton((button) => button.setButtonText("Remove").onClick(async () => {
+          delete this.plugin.settings.tagMultipliers[tag];
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+      }
+    });
+    if (this.hasSystemControlAccess() || !this.hasTagAccess()) {
+      const newTagSetting = new import_obsidian12.Setting(containerEl).setName("Add new tag multiplier").setDesc("Add a new tag and its point multiplier.");
+      let newTagInput = null;
+      let newMultiplierInput = null;
+      newTagSetting.addText((text) => {
+        text.setPlaceholder("#tag");
+        text.setValue("");
+        newTagInput = text.inputEl;
+      });
+      newTagSetting.addText((text) => {
+        text.setPlaceholder("multiplier");
+        text.setValue("1.0");
+        newMultiplierInput = text.inputEl;
+        newMultiplierInput.addEventListener("input", () => {
+          if (!this.hasSystemControlAccess()) {
+            let value = parseFloat(newMultiplierInput.value) || 1;
+            if (value > 10) {
+              newMultiplierInput.value = "10";
+            }
+          }
+        });
+      });
+      newTagSetting.addButton((button) => button.setButtonText("Add").onClick(async () => {
+        if (newTagInput && newMultiplierInput) {
+          const tag = newTagInput.value;
+          let multiplier = parseFloat(newMultiplierInput.value) || 1;
+          if (!this.hasSystemControlAccess() && multiplier > 10) {
+            multiplier = 10;
+            new import_obsidian12.Notice("Maximum tag multiplier limit is 10.");
+          }
+          const cost = multiplier * 10;
+          if (this.plugin.statCardData.points >= cost) {
+            if (tag && tag.startsWith("#")) {
+              this.plugin.statCardData.points -= cost;
+              this.plugin.settings.tagMultipliers[tag] = multiplier;
+              await this.plugin.saveSettings();
+              this.display();
+              new import_obsidian12.Notice(`New tag added for ${cost} points!`);
+            }
+          } else {
+            new import_obsidian12.Notice("Not enough points to add this tag!");
+          }
+        }
+      }));
+    }
+    new import_obsidian12.Setting(containerEl).setName("Task Assessment").setHeading();
+    new import_obsidian12.Setting(containerEl).setName("Scan Completed Tasks").setDesc("Find and assess all completed tasks that have not been logged.").addButton((button) => button.setButtonText("Scan Completed").onClick(async () => {
+      await this.plugin.taskAssessmentService.assessCompletedTasks();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Scan Interval (minutes)").setDesc("Set how often progress is saved and completed tasks are scanned.").addDropdown((dropdown) => {
+      ["1", "5", "10", "15", "30", "60"].forEach((value) => {
+        dropdown.addOption(value, `${value} minutes`);
+      });
+      dropdown.setValue(this.plugin.settings.scanInterval.toString());
+      dropdown.onChange(async (value) => {
+        this.plugin.settings.scanInterval = parseInt(value);
+        await this.plugin.saveSettings();
+        this.plugin.startPeriodicScanning();
+      });
+    });
+    new import_obsidian12.Setting(containerEl).setName("Deduct Points for Unchecking Tasks").setDesc("When a completed task is unchecked, deduct the awarded points.").addToggle((toggle) => {
+      toggle.setValue(this.plugin.settings.deductPointsForUnchecking);
+      if (!this.hasSystemControlAccess()) {
+        toggle.setDisabled(true);
+        toggle.toggleEl.title = "Permission Required.";
+      } else {
+        toggle.onChange(async (value) => {
+          this.plugin.settings.deductPointsForUnchecking = value;
+          await this.plugin.saveSettings();
+        });
+      }
+    });
+    new import_obsidian12.Setting(containerEl).setName("LLM API").setHeading();
+    new import_obsidian12.Setting(containerEl).setName("API URL").setDesc("URL of your local LLM API.").addText((text) => text.setValue(this.plugin.settings.apiUrl).onChange(async (value) => {
+      this.plugin.settings.apiUrl = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("API Key").setDesc("API key for authentication (if required).").addText((text) => text.setValue(this.plugin.settings.apiKey).setPlaceholder("your-api-key").onChange(async (value) => {
+      this.plugin.settings.apiKey = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Test Connection").setDesc("Test the connection to your LLM API.").addButton((button) => button.setButtonText("Test Connection").onClick(async () => {
+      const connectionTest = await this.plugin.testConnection();
+      if (connectionTest) {
+        new import_obsidian12.Notice("Connection successful!");
+        const models = await this.plugin.fetchAvailableModels();
+        this.plugin.availableModels = models;
+        this.updateModelDropdown();
+      } else {
+        new import_obsidian12.Notice("Connection failed. Please check your API URL and key.");
+      }
+    }));
+    const modelSetting = new import_obsidian12.Setting(containerEl).setName("LLM Model").setDesc("Select which LLM model to use for task assessment.");
+    this.modelDropdown = document.createElement("select");
+    this.modelDropdown.classList.add("dropdown");
+    this.modelDropdown.value = this.plugin.settings.selectedLLMModel;
+    this.modelDropdown.addEventListener("change", async () => {
+      this.plugin.settings.selectedLLMModel = this.modelDropdown.value;
+      await this.plugin.saveSettings();
+    });
+    const defaultOption = document.createElement("option");
+    defaultOption.value = this.plugin.settings.selectedLLMModel;
+    defaultOption.text = this.plugin.settings.selectedLLMModel;
+    this.modelDropdown.appendChild(defaultOption);
+    modelSetting.controlEl.appendChild(this.modelDropdown);
+    new import_obsidian12.Setting(containerEl).setName("Enable LLM").setDesc("Turn on LLM-powered features.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.LLM_param.enabled).onChange(async (value) => {
+        this.plugin.settings.LLM_param.enabled = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    if (this.plugin.settings.LLM_param.enabled) {
+      const llmSettingsContainer = containerEl.createDiv({ cls: "llm-settings-container" });
+      new import_obsidian12.Setting(llmSettingsContainer).setName("Temperature").setDesc("Controls randomness of LLM responses (0 = deterministic, 1 = very random).").addText(
+        (text) => text.setPlaceholder("0.7").setValue(this.plugin.settings.LLM_param.temp.toString()).onChange(async (value) => {
+          const parsedValue = parseFloat(value);
+          if (!isNaN(parsedValue)) {
+            this.plugin.settings.LLM_param.temp = parsedValue;
+            await this.plugin.saveSettings();
+          }
+        })
+      );
+      new import_obsidian12.Setting(llmSettingsContainer).setName("Max Tokens").setDesc("Set the maximum number of tokens the LLM should generate per request.").addText(
+        (text) => text.setPlaceholder("300").setDisabled(true).setValue(this.plugin.settings.LLM_param.max_tokens.toString()).onChange(async (value) => {
+          const parsedValue = parseInt(value);
+          if (!isNaN(parsedValue)) {
+            this.plugin.settings.LLM_param.max_tokens = parsedValue;
+            await this.plugin.saveSettings();
+          }
+        })
+      );
+      new import_obsidian12.Setting(llmSettingsContainer).setName("Enable Streaming").setDesc("Stream LLM responses in real-time.").addToggle(
+        (toggle) => toggle.setValue(this.plugin.settings.LLM_param.stream).setDisabled(true).onChange(async (value) => {
+          this.plugin.settings.LLM_param.stream = value;
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    new import_obsidian12.Setting(containerEl).setName("Enable Rate Limiting").setDesc("Limit the rate of requests to the LLM API to avoid issues.").addToggle((toggle) => toggle.setValue(this.plugin.settings.rateLimiting.enabled).onChange(async (value) => {
+      this.plugin.settings.rateLimiting.enabled = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Requests Per Minute").setDesc("Maximum number of requests to send per minute (1-60).").addSlider((slider) => slider.setLimits(1, 60, 1).setValue(this.plugin.settings.rateLimiting.requestsPerMinute).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.rateLimiting.requestsPerMinute = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Support").setHeading();
+    new import_obsidian12.Setting(containerEl).setName("Task Scan Button").setDesc("Toggle the Task Scan button in the ribbon").addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonButtons.taskScan).onChange(async (value) => {
+      this.plugin.settings.ribbonButtons.taskScan = value;
+      await this.plugin.saveSettings();
+      this.plugin.ribbonManager.updateRibbonIcons();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Inventory Button").setDesc("Toggle the Inventory button in the ribbon").addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonButtons.inventory).onChange(async (value) => {
+      this.plugin.settings.ribbonButtons.inventory = value;
+      await this.plugin.saveSettings();
+      this.plugin.ribbonManager.updateRibbonIcons();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Store Button").setDesc("Toggle the Store button in the ribbon").addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonButtons.store).onChange(async (value) => {
+      this.plugin.settings.ribbonButtons.store = value;
+      await this.plugin.saveSettings();
+      this.plugin.ribbonManager.updateRibbonIcons();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Request Button").setDesc("Toggle the Request button in the ribbon").addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonButtons.request).onChange(async (value) => {
+      this.plugin.settings.ribbonButtons.request = value;
+      await this.plugin.saveSettings();
+      this.plugin.ribbonManager.updateRibbonIcons();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Achievements Button").setDesc("Toggle the Achievements button in the ribbon").addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonButtons.achievements).onChange(async (value) => {
+      this.plugin.settings.ribbonButtons.achievements = value;
+      await this.plugin.saveSettings();
+      this.plugin.ribbonManager.updateRibbonIcons();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Refresh Button").setDesc("Toggle the Refresh UI button in the ribbon").addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonButtons.refresh).onChange(async (value) => {
+      this.plugin.settings.ribbonButtons.refresh = value;
+      await this.plugin.saveSettings();
+      this.plugin.ribbonManager.updateRibbonIcons();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Reload Plugin Button").setDesc("Toggle the Reload Plugin button in the ribbon").addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonButtons.reload).onChange(async (value) => {
+      this.plugin.settings.ribbonButtons.reload = value;
+      await this.plugin.saveSettings();
+      this.plugin.ribbonManager.updateRibbonIcons();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Settings Button").setDesc("Toggle the Settings button in the ribbon").addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonButtons.settings).onChange(async (value) => {
+      this.plugin.settings.ribbonButtons.settings = value;
+      await this.plugin.saveSettings();
+      this.plugin.ribbonManager.updateRibbonIcons();
+    }));
+    new import_obsidian12.Setting(containerEl).setName("Notification Logging").setHeading();
+    addNotificationSettingsUI(
+      containerEl,
+      this.plugin,
+      this.plugin.notificationListener,
+      this.plugin.settings.notification,
+      async () => await this.plugin.saveSettings()
+    );
+    new import_obsidian12.Setting(containerEl).setName("Data Reset").setHeading();
+    new import_obsidian12.Setting(containerEl).setName("Reset Completed Tasks").setDesc("Clear the list of completed tasks.").addButton((button) => {
+      button.setButtonText("Reset Task Completion Count").setWarning();
+      if (!this.hasSystemControlAccess()) {
+        button.setDisabled(true);
+        button.buttonEl.title = "Permission Required.";
+      } else {
+        button.onClick(async () => {
+          if (this.plugin.statCardData && this.plugin.statCardData.stats) {
+            const confirm2 = await new Promise((resolve) => {
+              const modal = new ConfirmationModal(
+                this.app,
+                "Reset Completed Tasks",
+                "Are you sure you want to reset completed tasks? This cannot be undone!",
+                resolve
+              );
+              modal.open();
+            });
+            if (confirm2) {
+              this.plugin.statCardData.stats.tasksCompleted = 0;
+              await this.plugin.saveStatCardData();
+              this.display();
+              new import_obsidian12.Notice("Task completion history has been reset.");
+              this.plugin.statCardService.refreshUI();
+            }
+          } else {
+            new import_obsidian12.Notice("Stats data not available.");
+          }
+        });
+      }
+    });
+    new import_obsidian12.Setting(containerEl).setName("Reset Progress").setDesc("Warning: This will reset all your progress!").addButton((button) => button.setButtonText("Reset All Progress").setWarning().onClick(async () => {
+      const confirm2 = await new Promise((resolve) => {
+        const modal = new ConfirmationModal(
+          this.app,
+          "Reset Progress",
+          "Are you sure you want to reset all progress? This cannot be undone!",
+          resolve
+        );
+        modal.open();
+      });
+      if (confirm2) {
+        this.plugin.initializeDefaultStatCardData();
+        await this.plugin.saveStatCardData();
+        this.display();
+        new import_obsidian12.Notice("All progress has been reset.");
+        this.plugin.statCardService.refreshUI();
+      }
+    }));
+    containerEl.createEl("h2", { text: "Debug Settings" });
+    new import_obsidian12.Setting(containerEl).setName("Enable Debug Mode").setDesc("Enables debug features.").addToggle((toggle) => {
+      toggle.setValue(this.plugin.settings.debugMode);
+      if (!this.hasSystemControlAccess()) {
+        toggle.setDisabled(true);
+        toggle.toggleEl.title = "Permission Required.";
+      } else {
+        toggle.onChange(async (value) => {
+          this.plugin.settings.debugMode = value;
+          await this.plugin.saveSettings();
+        });
+      }
+    });
+    if (this.plugin.settings.debugMode) {
+      const debugDesc = containerEl.createEl("div", {
+        cls: "setting-item-description",
+        text: "Debug mode is enabled."
+      });
+      if (this.plugin.hasDebugPermission()) {
+        const openDebugBtn = containerEl.createEl("button", {
+          text: "Open Debug Menu",
+          cls: "mod-cta"
+        });
+        openDebugBtn.addEventListener("click", () => {
+          new DebugMenu(this.app, this.plugin).open();
+        });
+      } else {
+        const warningDiv = containerEl.createEl("div", {
+          cls: "setting-item-description",
+          text: "You need be a Debugger to access debug features."
+        });
+      }
+    }
+  }
+  updateModelDropdown() {
+    if (!this.modelDropdown) return;
+    while (this.modelDropdown.firstChild) {
+      this.modelDropdown.removeChild(this.modelDropdown.firstChild);
+    }
+    if (this.plugin.availableModels && this.plugin.availableModels.length > 0) {
+      this.plugin.availableModels.forEach((model) => {
+        const option = document.createElement("option");
+        option.value = model.id;
+        option.text = model.id;
+        if (model.id === this.plugin.settings.selectedLLMModel) {
+          option.selected = true;
+        }
+        this.modelDropdown.appendChild(option);
+      });
+      if (!this.plugin.availableModels.some((m) => m.id === this.plugin.settings.selectedLLMModel)) {
+        const option = document.createElement("option");
+        option.value = this.plugin.settings.selectedLLMModel;
+        option.text = this.plugin.settings.selectedLLMModel + " (not found)";
+        option.selected = true;
+        this.modelDropdown.appendChild(option);
+      }
+    } else {
+      const option = document.createElement("option");
+      option.value = this.plugin.settings.selectedLLMModel;
+      option.text = this.plugin.settings.selectedLLMModel;
+      this.modelDropdown.appendChild(option);
+    }
+  }
+};
+var ConfirmationModal = class extends import_obsidian12.Modal {
+  constructor(app, title, message, result) {
+    super(app);
+    this.result = result;
+    this.message = message;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "Confirmation" });
+    contentEl.createEl("p", { text: this.message });
+    const buttonContainer = contentEl.createDiv();
+    buttonContainer.addClass("modal-button-container");
+    const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
+    cancelButton.addEventListener("click", () => {
+      this.result(false);
+      this.close();
+    });
+    const confirmButton = buttonContainer.createEl("button", { text: "Confirm" });
+    confirmButton.addClass("mod-warning");
+    confirmButton.addEventListener("click", () => {
+      this.result(true);
+      this.close();
+    });
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+
+// features/achievements.ts
+var import_obsidian13 = require("obsidian");
+var ACHIEVEMENT_VIEW_TYPE = "gamify-achievements-view";
+var ACHIEVEMENTS_ICON = `<svg viewBox="0 0 100 100" width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" stroke-width="5"/>
+  <polygon points="50,20 58,38 78,40 64,54 68,74 50,64 32,74 36,54 22,40 42,38" fill="currentColor"/>
+</svg>`;
+var AchievementsView = class extends import_obsidian13.ItemView {
+  constructor(leaf, plugin, achievementsService) {
+    super(leaf);
+    this.plugin = plugin;
+    this.achievementsService = achievementsService;
+  }
+  getViewType() {
+    return ACHIEVEMENT_VIEW_TYPE;
+  }
+  getDisplayText() {
+    return "Achievements";
+  }
+  async onOpen() {
+    this.displayAchievements();
+  }
+  async onClose() {
+  }
+  displayAchievements() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("gamify-achievements-view");
+    const header = contentEl.createEl("h2", { text: "Achievements" });
+    const achievementsContainer = contentEl.createDiv("gamify-achievements-container");
+    const achievementsList = achievementsContainer.createEl("ul", { cls: "gamify-achievements-list" });
+    const allAchievements = [
+      ...this.achievementsService.getDefaultAchievements(),
+      ...this.achievementsService.getCustomAchievements()
+    ];
+    allAchievements.sort((a, b) => {
+      const isAUnlocked = this.plugin.statCardData.achievements.some((ach) => ach.id === a.id);
+      const isBUnlocked = this.plugin.statCardData.achievements.some((ach) => ach.id === b.id);
+      return Number(isBUnlocked) - Number(isAUnlocked);
+    });
+    allAchievements.forEach((achievement) => {
+      const isUnlocked = this.plugin.statCardData.achievements.some((a) => a.id === achievement.id);
+      const achievementItem = achievementsList.createEl("li", { cls: "gamify-achievement-item" });
+      if (isUnlocked) {
+        achievementItem.addClass("unlocked");
+      } else {
+        achievementItem.addClass("locked");
+      }
+      const achievementHeader = achievementItem.createDiv("gamify-achievement-header");
+      achievementHeader.createEl("span", {
+        text: achievement.name,
+        cls: "gamify-achievement-name"
+      });
+      achievementItem.createEl("p", {
+        text: achievement.description,
+        cls: "gamify-achievement-description"
+      });
+      const tooltipContent = this.createTooltipContent(achievement, isUnlocked);
+      let activeMenu = null;
+      achievementItem.addEventListener("mouseenter", (event) => {
+        activeMenu = new import_obsidian13.Menu();
+        activeMenu.addItem((item) => {
+          item.setTitle(tooltipContent);
+          item.setDisabled(true);
+        });
+        activeMenu.showAtMouseEvent(event);
+      });
+      achievementItem.addEventListener("mouseleave", () => {
+        if (activeMenu) {
+          activeMenu.hide();
+        }
+      });
+    });
+  }
+  createTooltipContent(achievement, isUnlocked) {
+    if (isUnlocked) {
+      let content = `Condition: `;
+      switch (achievement.condition.type) {
+        case "writing":
+          content += `Write ${achievement.condition.value} characters`;
+          break;
+        case "tasks_completed":
+          content += `Complete ${achievement.condition.value} tasks`;
+          break;
+        case "streak":
+          content += `Maintain a streak of ${achievement.condition.value} days`;
+          break;
+        case "level":
+          content += `Reach level ${achievement.condition.value}`;
+          break;
+        case "notes_created":
+          content += `Create ${achievement.condition.value} notes`;
+          break;
+        case "items_purchased":
+          content += `Purchase ${achievement.condition.value} items`;
+          break;
+        case "point_collected":
+          content += `Collect ${achievement.condition.value} points`;
+          break;
+        default:
+          content += `Unknown condition type: ${achievement.condition.type}`;
+      }
+      content += `, Reward: `;
+      switch (achievement.reward.type) {
+        case "xp":
+          content += `${achievement.reward.value} XP`;
+          break;
+        case "points":
+          content += `${achievement.reward.value} Points`;
+          break;
+        case "title":
+          content += `Title: ${achievement.reward.value}`;
+          break;
+        case "temp_xp_multiplier":
+          content += `+${Math.round((achievement.reward.value - 1) * 100)}% XP for 24 hours`;
+          break;
+        case "perm_xp_multiplier":
+          content += `+${Math.round((achievement.reward.value - 1) * 100)}% XP (365 days)`;
+          break;
+        case "temp_discount":
+          content += `${Math.round(achievement.reward.value * 100)}% store discount for 24 hours`;
+          break;
+        case "perm_discount":
+          content += `${Math.round(achievement.reward.value * 100)}% store discount (365 days)`;
+          break;
+        default:
+          content += `Unknown reward type: ${achievement.reward.type}`;
+      }
+      return content;
+    } else {
+      return `Locked`;
+    }
+  }
+};
+var AchievementsService = class {
+  constructor(plugin) {
+    this.customAchievements = [];
+    this.defaultAchievements = [];
+    this.plugin = plugin;
+  }
+  async initialize() {
+    await this.loadCustomAchievements();
+    await this.createDefaultAchievementsIfNeeded();
+    this.checkForAchievements();
+    this.registerAchievementsView();
+  }
+  registerAchievementsView() {
+    this.plugin.registerView(
+      ACHIEVEMENT_VIEW_TYPE,
+      (leaf) => new AchievementsView(leaf, this.plugin, this)
+    );
+    this.plugin.addCommand({
+      id: "open-achievements-view",
+      name: "Open Achievements View",
+      callback: () => this.openAchievementsView()
+    });
+    (0, import_obsidian13.addIcon)("achievements-icon", ACHIEVEMENTS_ICON);
+  }
+  async openAchievementsView() {
+    const { workspace } = this.plugin.app;
+    const existing = workspace.getLeavesOfType(ACHIEVEMENT_VIEW_TYPE);
+    if (existing.length) {
+      workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = workspace.getRightLeaf(false);
+    if (leaf) {
+      await leaf.setViewState({
+        type: ACHIEVEMENT_VIEW_TYPE,
+        active: true
+      });
+      workspace.revealLeaf(leaf);
+    }
+  }
+  async loadCustomAchievements() {
+    this.customAchievements = [];
+    const folderPath = "QuestLog/Achievements";
+    try {
+      const files = this.plugin.app.vault.getFiles().filter(
+        (file) => file.path.startsWith(folderPath) && file.extension === "json"
+      );
+      for (const file of files) {
+        try {
+          const content = await this.plugin.app.vault.read(file);
+          const parsedData = JSON.parse(content);
+          if (Array.isArray(parsedData)) {
+            this.customAchievements.push(...parsedData);
+          } else {
+            console.warn(`Invalid JSON format in ${file.path}`);
+          }
+        } catch (error) {
+          console.error(`Failed to load custom achievements from ${file.path}:`, error);
+        }
+      }
+      if (this.customAchievements.length === 0) {
+        console.warn("No achievements found. Creating default Achievements.json...");
+        await this.createDefaultAchievementsFile();
+      }
+    } catch (error) {
+      console.error("Error loading Achievements:", error);
+    }
+  }
+  async createDefaultAchievementsFile() {
+    const defaultAchievements = JSON.stringify([
+      {
+        "id": "Hello World",
+        "name": "Hello World",
+        "description": "Write something",
+        "condition": { "type": "writing", "value": 1 },
+        "reward": { "type": "points", "value": 100 }
+      }
+    ], null, 2);
+    try {
+      await this.plugin.app.vault.create("QuestLog/Achievements/Achievements_0.json", defaultAchievements);
+      console.log("Default Achievements.json created.");
+    } catch (error) {
+      console.error("Error creating default Achievements.json:", error);
+    }
+  }
+  async createDefaultAchievementsIfNeeded() {
+    this.defaultAchievements = [];
+  }
+  checkForAchievements() {
+    const allAchievements = [
+      ...this.defaultAchievements,
+      ...this.customAchievements
+    ];
+    allAchievements.forEach((achievement) => {
+      if (!this.plugin.statCardData.achievements.some((a) => a.id === achievement.id) && this.isAchievementConditionMet(achievement.condition)) {
+        this.plugin.statCardData.achievements.push(achievement);
+        this.applyAchievementReward(achievement.reward);
+        new import_obsidian13.Notice(`\u{1F389} Achievement Unlocked: ${achievement.name}!`);
+      }
+    });
+  }
+  isAchievementConditionMet(condition) {
+    switch (condition.type) {
+      case "writing":
+        return this.plugin.statCardData.writingStats.totalCharactersTyped >= condition.value;
+      case "tasks_completed":
+        return this.plugin.statCardData.stats.tasksCompleted >= condition.value;
+      case "streak":
+        return this.plugin.statCardData.streaks.currentStreak >= condition.value;
+      case "level":
+        return this.plugin.statCardData.level >= condition.value;
+      case "notes_created":
+        return this.plugin.statCardData.stats.lastFileCount >= condition.value;
+      case "items_purchased":
+        return this.plugin.statCardData.stats.itemsPurchased >= condition.value;
+      case "point_collected":
+        return this.plugin.statCardData.stats.totalPointsEarned >= condition.value;
+      default:
+        return false;
+    }
+  }
+  applyAchievementReward(reward) {
+    this.plugin.statCardData.activeEffects = this.plugin.statCardData.activeEffects || {};
+    switch (reward.type) {
+      case "xp":
+        this.plugin.statCardData.xp += reward.value;
+        this.plugin.checkForLevelUp();
+        break;
+      case "points":
+        this.plugin.statCardData.points += reward.value;
+        break;
+      case "title":
+        if (!this.plugin.statCardData.titles.some((t) => t.id === reward.value)) {
+          this.plugin.statCardData.titles.push({
+            id: reward.value,
+            name: reward.value,
+            description: `Unlocked by an achievement`,
+            unlockedAt: (/* @__PURE__ */ new Date()).toISOString(),
+            effect: []
+          });
+        }
+        break;
+      case "temp_xp_multiplier":
+        this.plugin.statCardData.activeEffects.xpMultiplier = {
+          value: reward.value,
+          expiresAt: Date.now() + 24 * 60 * 60 * 1e3
+        };
+        new import_obsidian13.Notice(`\u{1F389} XP Boost Activated! +${(reward.value - 1) * 100}% XP for 24 hours!`);
+        break;
+      case "perm_xp_multiplier":
+        this.plugin.statCardData.activeEffects.xpMultiplier = {
+          value: reward.value,
+          expiresAt: Date.now() + 24 * 60 * 60 * 1e3 * 365
+        };
+        new import_obsidian13.Notice(`Semi-Permanent XP Boost! You now gain +${(reward.value - 1) * 100}% more XP for 365 days.`);
+        break;
+      case "temp_discount":
+        this.plugin.statCardData.activeEffects.storeDiscount = {
+          value: reward.value,
+          expiresAt: Date.now() + 24 * 60 * 60 * 1e3
+        };
+        new import_obsidian13.Notice(`\u{1F4B0} You unlocked a ${reward.value * 100}% discount on purchases for 24 hours!`);
+        break;
+      case "perm_discount":
+        this.plugin.statCardData.activeEffects.storeDiscount = {
+          value: reward.value,
+          expiresAt: Date.now() + 24 * 60 * 60 * 1e3 * 365
+        };
+        new import_obsidian13.Notice(`\u{1F6D2} Semi-Permanent Discount! All items are now ${reward.value * 100}% cheaper for 365 days.`);
+        break;
+      default:
+        new import_obsidian13.Notice(`You obtained an unknown reward.`);
+        console.warn(`Unknown reward type: ${reward.type}`);
+    }
+  }
+  getCustomAchievements() {
+    return this.customAchievements;
+  }
+  getDefaultAchievements() {
+    return this.defaultAchievements;
+  }
+};
+
+// core/ribbon.ts
+var import_obsidian14 = require("obsidian");
+var RibbonManager = class {
+  constructor(plugin) {
+    this.ribbonIcons = /* @__PURE__ */ new Map();
+    this.plugin = plugin;
+  }
+  async initialize() {
+    if (this.plugin.settings.ribbonButtons.taskScan) {
+      await this.addTaskScanButton();
+    }
+    if (this.plugin.settings.ribbonButtons.inventory) {
+      await this.addInventoryButton();
+    }
+    if (this.plugin.settings.ribbonButtons.store) {
+      await this.addStoreButton();
+    }
+    if (this.plugin.settings.ribbonButtons.request) {
+      await this.addRequestButton();
+    }
+    if (this.plugin.settings.ribbonButtons.achievements) {
+      await this.addAchievementsRibbonIcon();
+    }
+    if (this.plugin.settings.ribbonButtons.refresh) {
+      await this.addRefreshButton();
+    }
+    if (this.plugin.settings.ribbonButtons.reload) {
+      await this.addReloadButton();
+    }
+    if (this.plugin.settings.ribbonButtons.settings) {
+      await this.addSettingsButton();
+    }
+    if (this.plugin.settings.ribbonButtons.notifications) {
+      this.addNotificationsButton();
+    }
+  }
+  updateRibbonIcons() {
+    this.removeAllRibbonIcons();
+    this.initialize();
+  }
+  removeAllRibbonIcons() {
+    for (const [id, element] of this.ribbonIcons) {
+      element.remove();
+    }
+    this.ribbonIcons.clear();
+  }
+  addRibbonIconWithTracking(icon, title, callback) {
+    const ribbonIcon = this.plugin.addRibbonIcon(icon, title, callback);
+    this.ribbonIcons.set(title, ribbonIcon);
+    return ribbonIcon;
+  }
+  async addTaskScanButton() {
+    this.addRibbonIconWithTracking("check-circle", "Scan for Tasks", () => {
+      this.plugin.taskAssessmentService.assessCompletedTasks();
+      new import_obsidian14.Notice("Manual scan started.");
+    });
+  }
+  addNotificationsButton() {
+    this.addRibbonIconWithTracking("bell", "Notification History", () => {
+      new NotificationModal(this.plugin.app, this.plugin.notificationListener).open();
+    });
+  }
+  async addInventoryButton() {
+    var _a;
+    if ((_a = this.plugin.statCardData.ownedItems) == null ? void 0 : _a.includes("infinite_inventory")) {
+      this.addRibbonIconWithTracking("package", "Open Inventory", () => {
+        this.plugin.activateInventoryTab();
+      });
+    }
+  }
+  async addStoreButton() {
+    this.addRibbonIconWithTracking("store", "Open Store", () => {
+      new ItemStoreModal(this.plugin.app, this.plugin, this.plugin.itemStoreService).open();
+    });
+  }
+  async addRequestButton() {
+    var _a;
+    if ((_a = this.plugin.statCardData.ownedItems) == null ? void 0 : _a.includes("mysterious_tablet")) {
+      this.addRibbonIconWithTracking("zap", "Request", () => {
+        new RedeemTaskModal(this.plugin.app, this.plugin).open();
+      });
+    }
+  }
+  addAchievementsRibbonIcon() {
+    this.addRibbonIconWithTracking(
+      "achievements-icon",
+      "Achievements",
+      async () => {
+        await this.plugin.achievementsService.openAchievementsView();
+      }
+    );
+  }
+  async addRefreshButton() {
+    this.addRibbonIconWithTracking("refresh-cw", "Refresh VaultQuest UI", () => {
+      this.plugin.checkForLevelUp();
+      this.plugin.achievementsService.checkForAchievements();
+      this.plugin.statCardService.refreshUI();
+    });
+  }
+  async addReloadButton() {
+    this.addRibbonIconWithTracking("refresh-ccw-dot", "Reload Plugin", () => {
+      this.plugin.app.plugins.disablePlugin(this.plugin.manifest.id);
+      this.plugin.app.plugins.enablePlugin(this.plugin.manifest.id);
+    });
+  }
+  async addSettingsButton() {
+    this.addRibbonIconWithTracking("settings", "Open Plugin Settings", () => {
+      this.plugin.app.setting.open();
+      this.plugin.app.setting.openTabById(this.plugin.manifest.id);
+    });
   }
 };
 
@@ -2728,6 +4241,8 @@ var DEFAULT_SETTINGS = {
   apiUrl: "http://localhost:1234",
   apiKey: "your-api-key",
   themeId: "gamesystem",
+  useStatusBarIndicator: true,
+  useRibbonIndicator: true,
   trackedNotes: [],
   selectedLLMModel: "local-model",
   rateLimiting: {
@@ -2735,19 +4250,37 @@ var DEFAULT_SETTINGS = {
     requestsPerMinute: 10
     //minutes
   },
+  LLM_param: {
+    enabled: false,
+    temp: 0.7,
+    max_tokens: 300,
+    stream: false
+  },
   scanInterval: 5,
   //minutes
   deductPointsForUnchecking: true,
   debugMode: false,
   enableInventoryTab: true,
-  inventoryPositions: {}
+  inventoryPositions: {},
+  ribbonButtons: {
+    taskScan: true,
+    inventory: true,
+    store: true,
+    request: true,
+    achievements: true,
+    refresh: true,
+    reload: false,
+    settings: true
+  },
+  notification: {
+    maxNotificationsToStore: 50,
+    enableNotificationCapture: true
+  }
 };
-var GamifyPlugin = class extends import_obsidian7.Plugin {
+var GamifyPlugin = class extends import_obsidian15.Plugin {
   constructor() {
     super(...arguments);
     this.availableModels = [];
-    this.customAchievements = [];
-    this.defaultAchievements = [];
     this.requestQueue = [];
     this.processingQueue = false;
     this.lastRequestTime = 0;
@@ -2756,15 +4289,24 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
     this.effectsCheckIntervalId = null;
     this.autoSaveIntervalId = null;
   }
-  loadVaultQuestStyles() {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.type = "text/css";
-    link.href = this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/styles.css`);
-    link.id = "vaultquest-stylesheet";
+  async loadVaultQuestStyles() {
+    const styleFile = `${this.manifest.dir}/styles.css`;
     const existing = document.getElementById("vaultquest-stylesheet");
     if (existing) existing.remove();
-    document.head.appendChild(link);
+    try {
+      const file = this.app.vault.getAbstractFileByPath(styleFile);
+      if (file && file instanceof import_obsidian15.TFile) {
+        const content = await this.app.vault.read(file);
+        const styleElement = document.createElement("style");
+        styleElement.id = "vaultquest-stylesheet";
+        styleElement.textContent = content;
+        document.head.appendChild(styleElement);
+      } else {
+        console.warn(`VaultQuest: Stylesheet not found at ${styleFile}`);
+      }
+    } catch (error) {
+      console.error("VaultQuest: Failed to load styles.css", error);
+    }
   }
   startAutoSave() {
     if (this.autoSaveIntervalId) clearInterval(this.autoSaveIntervalId);
@@ -2789,10 +4331,10 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
   }
   async onload() {
     this.app.workspace.onLayoutReady(async () => {
-      var _a, _b;
       await this.loadSettings();
       await this.loadStatCardData();
-      await this.loadCustomAchievements();
+      this.achievementsService = new AchievementsService(this);
+      await this.achievementsService.initialize();
       this.app.workspace.containerEl.classList.add("vaultquest-styles");
       this.statCardService = new StatCardService(this);
       this.llmTaskService = new LLMTaskService(this);
@@ -2801,35 +4343,23 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
       this.statCardService.initializeUI();
       this.statCardService.refreshUI();
       this.taskAssessmentService = new TaskAssessmentService(this);
-      this.taskAssessmentService.initializeTaskStorage();
       this.startPeriodicScanning();
       this.startPeriodicEffectsCheck();
-      this.checkForAchievements();
+      this.achievementsService.checkForAchievements();
       new TaskStorageRibbonIcon(this, this.taskAssessmentService);
-      await this.addRibbonIcon("check-circle", "Scan for Tasks", () => {
-        this.taskAssessmentService.assessCompletedTasks();
-        new import_obsidian7.Notice("Manual scan started.");
-      });
-      if ((_a = this.statCardData.ownedItems) == null ? void 0 : _a.includes("infinite_inventory")) {
-        this.addRibbonIcon("package", "Open Inventory", () => {
-          this.activateInventoryTab();
-        });
-      }
-      this.addRibbonIcon("store", "Open Store", () => {
-        new ItemStoreModal(this.app, this, this.itemStoreService).open();
-      });
-      if ((_b = this.statCardData.ownedItems) == null ? void 0 : _b.includes("mysterious_tablet")) {
-        this.addRibbonIcon("zap", "Request", () => {
-          new RedeemTaskModal(this.app, this).open();
-        });
-      }
-      await this.addRibbonIcon("refresh-cw", "Refresh VaultQuest UI", () => {
-        this.checkForLevelUp();
-        this.checkForAchievements();
-        this.statCardService.refreshUI();
-      });
+      this.ribbonManager = new RibbonManager(this);
+      await this.ribbonManager.initialize();
       this.processingIndicatorService = new ProcessingIndicatorService(this);
-      this.processingIndicatorService.initializeUI();
+      this.notificationListener = new NotificationListener(this, this.settings.notification);
+      await this.notificationListener.loadNotifications();
+      this.notificationListener.initialize();
+      this.addCommand({
+        id: "open-notification-history",
+        name: "Show Notification History",
+        callback: () => {
+          new NotificationModal(this.app, this.notificationListener).open();
+        }
+      });
       this.registerView(
         "inventory-view",
         (leaf) => new InventoryTabView(leaf, this)
@@ -2839,56 +4369,77 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
         timeout: null
       };
       this.registerDomEvent(document, "keydown", (evt) => {
-        const view = this.app.workspace.getActiveViewOfType(import_obsidian7.MarkdownView);
+        const view = this.app.workspace.getActiveViewOfType(import_obsidian15.MarkdownView);
         if (view && this.isContentKey(evt)) {
           this.handleTyping();
         }
       });
+      this.registerView(
+        TASK_STORAGE_VIEW_TYPE,
+        (leaf) => new TaskStorageViewer(leaf, this, this.taskAssessmentService)
+      );
       this.addCommand({
-        id: "track-current-note",
-        name: "Track Current Note for Tasks",
-        callback: () => this.trackCurrentNote()
-      });
-      this.addCommand({
-        id: "untrack-note",
-        name: "Remove Note from Task Tracking",
-        callback: () => this.showUntrackNoteModal()
-      });
-      this.addCommand({
-        id: "scan-tasks",
-        name: "Scan Completed Tasks",
-        callback: () => this.taskAssessmentService.assessCompletedTasks()
-      });
-      this.addCommand({
-        id: "open-inventory",
-        name: "Open Inventory",
-        callback: () => this.activateInventoryTab()
-      });
-      this.addCommand({
-        id: "open-vq-item-store",
-        name: "Open Store",
-        callback: () => new ItemStoreModal(this.app, this, this.itemStoreService).open()
-      });
-      this.addCommand({
-        id: "open-debug-menu",
-        name: "Open Debug Menu",
+        id: "open-task-storage",
+        name: "Open Task Storage",
         callback: () => {
-          if (this.hasDebugPermission()) {
-            new DebugMenu(this.app, this).open();
-          } else {
-            new import_obsidian7.Notice("Debug access denied.");
-          }
+          this.activateTaskStorageTab();
         }
       });
+      new TaskStorageRibbonIcon(this, this.taskAssessmentService);
+      this.initializeCommands();
       this.addSettingTab(new GamifySettingTab(this.app, this));
       await this.statCardService.refreshUI();
       this.startAutoSave();
+      window.addEventListener("beforeunload", async () => {
+        await this.saveStatCardData();
+      });
+    });
+  }
+  initializeCommands() {
+    this.addCommand({
+      id: "track-current-note",
+      name: "Track Current Note for Tasks",
+      callback: () => this.trackCurrentNote()
+    });
+    this.addCommand({
+      id: "untrack-note",
+      name: "Remove Note from Task Tracking",
+      callback: () => this.showUntrackNoteModal()
+    });
+    this.addCommand({
+      id: "scan-tasks",
+      name: "Scan Completed Tasks",
+      callback: () => this.taskAssessmentService.assessCompletedTasks()
+    });
+    this.addCommand({
+      id: "open-inventory",
+      name: "Open Inventory",
+      callback: () => this.activateInventoryTab()
+    });
+    this.addCommand({
+      id: "open-vq-item-store",
+      name: "Open Store",
+      callback: () => new ItemStoreModal(this.app, this, this.itemStoreService).open()
+    });
+    this.addCommand({
+      id: "open-debug-menu",
+      name: "Open Debug Menu",
+      callback: () => {
+        if (this.hasDebugPermission()) {
+          new DebugMenu(this.app, this).open();
+        } else {
+          new import_obsidian15.Notice("Debug access denied.");
+        }
+      }
     });
   }
   async onunload() {
     if (this.typing.timeout) {
       clearTimeout(this.typing.timeout);
       this.processTypingXp();
+    }
+    if (this.processingIndicatorService) {
+      this.processingIndicatorService.destroy();
     }
     if (this.autoSaveIntervalId) {
       clearInterval(this.autoSaveIntervalId);
@@ -2905,131 +4456,12 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
       clearInterval(this.effectsCheckIntervalId);
       this.effectsCheckIntervalId = null;
     }
+    this.notificationListener.cleanup();
     await this.saveStatCardData();
   }
   hasInfiniteInventory() {
     var _a;
     return ((_a = this.statCardData.ownedItems) == null ? void 0 : _a.includes("infinite_inventory")) || false;
-  }
-  async loadCustomAchievements() {
-    this.customAchievements = [];
-    try {
-      const dataFile = this.app.vault.getAbstractFileByPath("QuestLog/Achievements.json");
-      if (dataFile instanceof import_obsidian7.TFile) {
-        const content = await this.app.vault.read(dataFile);
-        const parsedData = JSON.parse(content);
-        this.customAchievements = parsedData;
-      } else {
-        console.warn("Achievements.json not found. Creating default file...");
-        await this.createDefaultAchievementsFile();
-      }
-    } catch (error) {
-      console.error("Error loading Achievements.json:", error);
-    }
-  }
-  async createDefaultAchievementsFile() {
-    const defaultAchievements = JSON.stringify([
-      {
-        "id": "wordsmith",
-        "name": "Wordsmith",
-        "description": "Write 10,000 characters",
-        "condition": { "type": "writing", "value": 1e4 },
-        "reward": { "type": "xp", "value": 1e3 }
-      }
-    ], null, 2);
-    try {
-      await this.app.vault.create("QuestLog/Achievements.json", defaultAchievements);
-      console.log("Default Achievements.json created.");
-    } catch (error) {
-      console.error("Error creating default Achievements.json:", error);
-    }
-  }
-  async checkForAchievements() {
-    const allAchievements = [
-      ...this.defaultAchievements,
-      ...this.customAchievements
-    ];
-    allAchievements.forEach((achievement) => {
-      if (!this.statCardData.achievements.some((a) => a.id === achievement.id) && this.isAchievementConditionMet(achievement.condition)) {
-        this.statCardData.achievements.push(achievement);
-        this.applyAchievementReward(achievement.reward);
-        new import_obsidian7.Notice(`\u{1F389} Achievement Unlocked: ${achievement.name}!`);
-      }
-    });
-  }
-  isAchievementConditionMet(condition) {
-    switch (condition.type) {
-      case "writing":
-        return this.statCardData.writingStats.totalCharactersTyped >= condition.value;
-      case "tasks_completed":
-        return this.statCardData.stats.tasksCompleted >= condition.value;
-      case "streak":
-        return this.statCardData.streaks.currentStreak >= condition.value;
-      case "level":
-        return this.statCardData.level >= condition.value;
-      case "notes_created":
-        return this.statCardData.stats.lastFileCount >= condition.value;
-      case "items_purchased":
-        return this.statCardData.stats.itemsPurchased >= condition.value;
-      case "point_collected":
-        return this.statCardData.stats.totalPointsEarned >= condition.value;
-      default:
-        return false;
-    }
-  }
-  applyAchievementReward(reward) {
-    this.statCardData.activeEffects = this.statCardData.activeEffects || {};
-    switch (reward.type) {
-      case "xp":
-        this.statCardData.xp += reward.value;
-        this.checkForLevelUp();
-        break;
-      case "points":
-        this.statCardData.points += reward.value;
-        break;
-      case "title":
-        if (!this.statCardData.titles.some((t) => t.id === reward.value)) {
-          this.statCardData.titles.push({
-            id: reward.value,
-            name: reward.value,
-            description: `Unlocked by an achievement`,
-            unlockedAt: (/* @__PURE__ */ new Date()).toISOString(),
-            effect: []
-          });
-        }
-        break;
-      case "temp_xp_multiplier":
-        this.statCardData.activeEffects.xpMultiplier = {
-          value: reward.value,
-          expiresAt: Date.now() + 24 * 60 * 60 * 1e3
-        };
-        new import_obsidian7.Notice(`\u{1F389} XP Boost Activated! +${(reward.value - 1) * 100}% XP for 24 hours!`);
-        break;
-      case "perm_xp_multiplier":
-        this.statCardData.activeEffects.xpMultiplier = {
-          value: reward.value,
-          expiresAt: Date.now() + 24 * 60 * 60 * 1e3 * 365
-        };
-        new import_obsidian7.Notice(`Semi-Permanent XP Boost! You now gain +${(reward.value - 1) * 100}% more XP for 365 days.`);
-        break;
-      case "temp_discount":
-        this.statCardData.activeEffects.storeDiscount = {
-          value: reward.value,
-          expiresAt: Date.now() + 24 * 60 * 60 * 1e3
-        };
-        new import_obsidian7.Notice(`\u{1F4B0} You unlocked a ${reward.value * 100}% discount on purchases for 24 hours!`);
-        break;
-      case "perm_discount":
-        this.statCardData.activeEffects.storeDiscount = {
-          value: reward.value,
-          expiresAt: Date.now() + 24 * 60 * 60 * 1e3 * 365
-        };
-        new import_obsidian7.Notice(`\u{1F6D2} Semi-Permanent Discount! All items are now ${reward.value * 100}% cheaper for 365 days.`);
-        break;
-      default:
-        new import_obsidian7.Notice(`You obtained an unknown reward.`);
-        console.warn(`Unknown reward type: ${reward.type}`);
-    }
   }
   updateStreak() {
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
@@ -3050,13 +4482,24 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
     }
     this.statCardData.streaks.lastActiveDate = today;
   }
+  async activateTaskStorageTab() {
+    const { workspace } = this.app;
+    const existingLeaves = workspace.getLeavesOfType(TASK_STORAGE_VIEW_TYPE);
+    if (existingLeaves.length > 0) {
+      workspace.revealLeaf(existingLeaves[0]);
+      return;
+    }
+    const leaf = workspace.getLeaf("tab");
+    await leaf.setViewState({ type: TASK_STORAGE_VIEW_TYPE, active: true });
+    workspace.revealLeaf(leaf);
+  }
   async activateInventoryTab() {
     if (!this.settings.enableInventoryTab) {
-      new import_obsidian7.Notice("Inventory tab is disabled in settings");
+      new import_obsidian15.Notice("Inventory tab is disabled in settings");
       return;
     }
     if (!this.hasInfiniteInventory()) {
-      new import_obsidian7.Notice("You need to acquire the 'Infinite Inventory' item first!");
+      new import_obsidian15.Notice("You need to acquire the 'Infinite Inventory' item first!");
       return;
     }
     const existingLeaves = this.app.workspace.getLeavesOfType("inventory-view");
@@ -3092,28 +4535,28 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
     this.typing.characterCount = 0;
     this.typing.timeout = null;
     this.checkForLevelUp();
-    this.checkForAchievements();
+    this.achievementsService.checkForAchievements();
     this.statCardService.refreshUI();
   }
   async trackCurrentNote() {
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {
-      new import_obsidian7.Notice("No active file to track.");
+      new import_obsidian15.Notice("No active file to track.");
       return;
     }
     const filePath = activeFile.path;
     if (!this.settings.trackedNotes.includes(filePath)) {
       this.settings.trackedNotes.push(filePath);
       await this.saveSettings();
-      new import_obsidian7.Notice(`Now tracking "${activeFile.basename}" for tasks.`);
+      new import_obsidian15.Notice(`Now tracking "${activeFile.basename}" for tasks.`);
       await this.saveStatCardData();
     } else {
-      new import_obsidian7.Notice(`Already tracking "${activeFile.basename}".`);
+      new import_obsidian15.Notice(`Already tracking "${activeFile.basename}".`);
     }
   }
   async showUntrackNoteModal() {
     if (this.settings.trackedNotes.length === 0) {
-      new import_obsidian7.Notice("No notes are currently being tracked.");
+      new import_obsidian15.Notice("No notes are currently being tracked.");
       return;
     }
     const modal = new SelectNoteModal(
@@ -3122,7 +4565,7 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
       async (selectedPath) => {
         this.settings.trackedNotes = this.settings.trackedNotes.filter((path) => path !== selectedPath);
         await this.saveSettings();
-        new import_obsidian7.Notice(`Stopped tracking "${selectedPath.split("/").pop()}".`);
+        new import_obsidian15.Notice(`Stopped tracking "${selectedPath.split("/").pop()}".`);
         await this.saveStatCardData();
       }
     );
@@ -3253,15 +4696,7 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
       if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.tool_calls && data.choices[0].message.tool_calls[0]) {
         const toolCall = data.choices[0].message.tool_calls[0];
         const functionArgs = JSON.parse(toolCall.function.arguments);
-        if (functionArgs.difficulty_assessment === "very_hard" && this.statCardData.stats.highestDifficulty < 4) {
-          this.statCardData.stats.highestDifficulty = 4;
-        } else if (functionArgs.difficulty_assessment === "hard" && this.statCardData.stats.highestDifficulty < 3) {
-          this.statCardData.stats.highestDifficulty = 3;
-        } else if (functionArgs.difficulty_assessment === "medium" && this.statCardData.stats.highestDifficulty < 2) {
-          this.statCardData.stats.highestDifficulty = 2;
-        } else if (functionArgs.difficulty_assessment === "easy" && this.statCardData.stats.highestDifficulty < 1) {
-          this.statCardData.stats.highestDifficulty = 1;
-        }
+        this.updateDifficultyStats(functionArgs.difficulty_assessment);
         return Math.round(functionArgs.points);
       }
       throw new Error("Could not extract points from LLM response");
@@ -3270,15 +4705,28 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
       throw error;
     }
   }
+  updateDifficultyStats(difficultyAssessment) {
+    const difficultyMap = {
+      "very_hard": 4,
+      "hard": 3,
+      "medium": 2,
+      "easy": 1
+    };
+    const key = difficultyAssessment;
+    const difficultyLevel = key in difficultyMap ? difficultyMap[key] : 0;
+    if (difficultyLevel > this.statCardData.stats.highestDifficulty) {
+      this.statCardData.stats.highestDifficulty = difficultyLevel;
+    }
+  }
   async checkForLevelUp() {
     while (this.statCardData.xp >= this.statCardData.nextLevelXp) {
       this.statCardData.xp -= this.statCardData.nextLevelXp;
       this.statCardData.level++;
       this.statCardData.nextLevelXp = Math.round(this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * 0.05));
-      new import_obsidian7.Notice(`Congratulations! You reached level ${this.statCardData.level}!`);
+      new import_obsidian15.Notice(`Congratulations! You reached level ${this.statCardData.level}!`);
       const levelUpReward = Math.round(10 + this.statCardData.level * 2 + this.statCardData.level ** 1.5);
       this.statCardData.points += levelUpReward;
-      new import_obsidian7.Notice(`You've been awarded ${levelUpReward} tokens!`);
+      new import_obsidian15.Notice(`You've been awarded ${levelUpReward} tokens!`);
     }
   }
   async loadSettings() {
@@ -3290,7 +4738,7 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
   async loadStatCardData() {
     try {
       const dataFile = this.app.vault.getAbstractFileByPath("QuestLog/data.json");
-      if (dataFile instanceof import_obsidian7.TFile) {
+      if (dataFile instanceof import_obsidian15.TFile) {
         const content = await this.app.vault.read(dataFile);
         const parsedData = JSON.parse(content);
         this.statCardData = parsedData.statCardData || parsedData;
@@ -3310,11 +4758,9 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
     for (const [key, effect] of Object.entries(this.statCardData.activeEffects)) {
       if (effect.expiresAt && effect.expiresAt < now) {
         delete this.statCardData.activeEffects[key];
-        new import_obsidian7.Notice(`Your ${key} effect has expired.`);
+        new import_obsidian15.Notice(`Your ${key} effect has expired.`);
         effectsChanged = true;
       }
-    }
-    if (effectsChanged) {
     }
   }
   initializeDefaultStatCardData() {
@@ -3376,21 +4822,20 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
       if (!folder2) {
         await this.app.vault.createFolder(folderPath2);
         console.log(`Created plugin data folder: ${folderPath2}`);
-        new import_obsidian7.Notice(`You can add custom items in '${folderPath2}'.`);
+        new import_obsidian15.Notice(`You can add custom items in '${folderPath2}'.`);
       }
       console.log(`Loading custom items from: ${folderPath2}`);
       const data = JSON.stringify({ statCardData: this.statCardData }, null, 2);
       const dataFile = this.app.vault.getAbstractFileByPath(filePath);
-      if (dataFile instanceof import_obsidian7.TFile) {
+      if (dataFile instanceof import_obsidian15.TFile) {
         await this.app.vault.modify(dataFile, data);
       } else {
         await this.app.vault.create(filePath, data);
-        new import_obsidian7.Notice(`Log: Database Created.`);
+        new import_obsidian15.Notice(`Log: Database Created.`);
       }
-      new import_obsidian7.Notice("Log: Database Updated");
     } catch (error) {
       console.error("Error saving user data:", error);
-      new import_obsidian7.Notice("Error saving progress data.");
+      new import_obsidian15.Notice("Error saving progress data.");
     }
   }
   async fetchAvailableModels() {
@@ -3426,453 +4871,7 @@ var GamifyPlugin = class extends import_obsidian7.Plugin {
     }
   }
 };
-var GamifySettingTab = class extends import_obsidian7.PluginSettingTab {
-  constructor(app, plugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
-  hasSystemControlAccess() {
-    return this.plugin.statCardData && this.plugin.statCardData.ownedItems && this.plugin.statCardData.ownedItems.includes("system_control");
-  }
-  async display() {
-    var _a, _b, _c, _d, _e, _f, _g;
-    const { containerEl } = this;
-    containerEl.empty();
-    containerEl.createEl("h2", { text: "Tracked Notes" });
-    const trackedNotesContainer = containerEl.createDiv();
-    if (this.plugin.settings.trackedNotes.length === 0) {
-      trackedNotesContainer.createEl("p", {
-        text: 'No notes are currently being tracked. Use the "Track Current Note for Tasks" command to start tracking notes.'
-      });
-    } else {
-      const ul = trackedNotesContainer.createEl("ul");
-      this.plugin.settings.trackedNotes.forEach((path) => {
-        const li = ul.createEl("li");
-        li.createEl("span", { text: path });
-        const removeButton = li.createEl("button", {
-          text: "Remove",
-          cls: "gamify-remove-btn"
-        });
-        removeButton.style.marginLeft = "10px";
-        removeButton.addEventListener("click", async () => {
-          this.plugin.settings.trackedNotes = this.plugin.settings.trackedNotes.filter((p) => p !== path);
-          await this.plugin.saveSettings();
-          this.display();
-        });
-      });
-    }
-    containerEl.createEl("h2", { text: "XP/Point Modifier" });
-    if (!this.hasSystemControlAccess()) {
-      const notice = containerEl.createEl("div", {
-        cls: "setting-item-description",
-        text: "You do not have permission to modify this settings."
-      });
-      notice.style.color = "var(--text-error)";
-      notice.style.marginBottom = "1em";
-    }
-    new import_obsidian7.Setting(containerEl).setName("XP per character").setDesc("How much XP is earned for each character typed.").addText((text) => {
-      text.setValue(this.plugin.settings.xpPerCharacter.toString());
-      if (!this.hasSystemControlAccess()) {
-        text.setDisabled(true);
-        text.inputEl.title = "Permission Required.";
-      } else {
-        text.onChange(async (value) => {
-          this.plugin.settings.xpPerCharacter = parseFloat(value) || 0.1;
-          await this.plugin.saveSettings();
-        });
-      }
-    });
-    new import_obsidian7.Setting(containerEl).setName("Base points value").setDesc("Base points awarded for completing a task.").addText((text) => {
-      text.setValue(this.plugin.settings.pointsBaseValue.toString());
-      if (!this.hasSystemControlAccess()) {
-        text.setDisabled(true);
-        text.inputEl.title = "Permission Required.";
-      } else {
-        text.onChange(async (value) => {
-          this.plugin.settings.pointsBaseValue = parseInt(value) || 10;
-          await this.plugin.saveSettings();
-        });
-      }
-    });
-    containerEl.createEl("h2", { text: "Tag Multipliers" });
-    if (!this.hasSystemControlAccess()) {
-      const notice = containerEl.createEl("div", {
-        cls: "setting-item-description",
-        text: "You do not have permission to modify this settings."
-      });
-      notice.style.color = "var(--text-error)";
-      notice.style.marginBottom = "1em";
-    }
-    Object.entries(this.plugin.settings.tagMultipliers).forEach(([tag, multiplier]) => {
-      const setting = new import_obsidian7.Setting(containerEl).setName(`Multiplier for ${tag}`).setDesc(`Multiplier for tasks with the ${tag} tag.`).addText((text) => {
-        text.setValue(multiplier.toString());
-        if (!this.hasSystemControlAccess()) {
-          text.setDisabled(true);
-          text.inputEl.title = "Permission Required.";
-        } else {
-          text.onChange(async (value) => {
-            this.plugin.settings.tagMultipliers[tag] = parseFloat(value) || 1;
-            await this.plugin.saveSettings();
-          });
-        }
-      });
-      if (this.hasSystemControlAccess()) {
-        setting.addButton((button) => button.setButtonText("Remove").onClick(async () => {
-          delete this.plugin.settings.tagMultipliers[tag];
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-      }
-    });
-    if (this.hasSystemControlAccess()) {
-      const newTagSetting = new import_obsidian7.Setting(containerEl).setName("Add new tag multiplier").setDesc("Add a new tag and its point multiplier.");
-      let newTagInput = null;
-      let newMultiplierInput = null;
-      newTagSetting.addText((text) => {
-        text.setPlaceholder("#tag");
-        text.setValue("");
-        newTagInput = text.inputEl;
-      });
-      newTagSetting.addText((text) => {
-        text.setPlaceholder("multiplier");
-        text.setValue("1.0");
-        newMultiplierInput = text.inputEl;
-      });
-      newTagSetting.addButton((button) => button.setButtonText("Add").onClick(async () => {
-        if (newTagInput && newMultiplierInput) {
-          const tag = newTagInput.value;
-          const multiplier = parseFloat(newMultiplierInput.value) || 1;
-          if (tag && tag.startsWith("#")) {
-            this.plugin.settings.tagMultipliers[tag] = multiplier;
-            await this.plugin.saveSettings();
-            this.display();
-          }
-        }
-      }));
-    }
-    containerEl.createEl("h2", { text: "Task Assessment" });
-    new import_obsidian7.Setting(containerEl).setName("Scan Completed Tasks").setDesc("Find and assess all completed tasks that have not been logged.").addButton((button) => button.setButtonText("Scan Completed").onClick(async () => {
-      await this.plugin.taskAssessmentService.assessCompletedTasks();
-    }));
-    new import_obsidian7.Setting(containerEl).setName("Scan Interval (minutes)").setDesc("Set how often progress is saved and completed tasks are scanned.").addDropdown((dropdown) => {
-      ["1", "5", "10", "15", "30", "60"].forEach((value) => {
-        dropdown.addOption(value, `${value} minutes`);
-      });
-      dropdown.setValue(this.plugin.settings.scanInterval.toString());
-      dropdown.onChange(async (value) => {
-        this.plugin.settings.scanInterval = parseInt(value);
-        await this.plugin.saveSettings();
-        this.plugin.startPeriodicScanning();
-      });
-    });
-    new import_obsidian7.Setting(containerEl).setName("Deduct Points for Unchecking Tasks").setDesc("When a completed task is unchecked, deduct the awarded points.").addToggle((toggle) => {
-      toggle.setValue(this.plugin.settings.deductPointsForUnchecking);
-      if (!this.hasSystemControlAccess()) {
-        toggle.setDisabled(true);
-        toggle.toggleEl.title = "Permission Required.";
-      } else {
-        toggle.onChange(async (value) => {
-          this.plugin.settings.deductPointsForUnchecking = value;
-          await this.plugin.saveSettings();
-        });
-      }
-    });
-    containerEl.createEl("h2", { text: "Rate Limiting" });
-    new import_obsidian7.Setting(containerEl).setName("Enable Rate Limiting").setDesc("Limit the rate of requests to the LLM API to avoid issues.").addToggle((toggle) => toggle.setValue(this.plugin.settings.rateLimiting.enabled).onChange(async (value) => {
-      this.plugin.settings.rateLimiting.enabled = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian7.Setting(containerEl).setName("Requests Per Minute").setDesc("Maximum number of requests to send per minute (1-60).").addSlider((slider) => slider.setLimits(1, 60, 1).setValue(this.plugin.settings.rateLimiting.requestsPerMinute).setDynamicTooltip().onChange(async (value) => {
-      this.plugin.settings.rateLimiting.requestsPerMinute = value;
-      await this.plugin.saveSettings();
-    }));
-    containerEl.createEl("h2", { text: "LLM API" });
-    new import_obsidian7.Setting(containerEl).setName("API URL").setDesc("URL of your local LLM API.").addText((text) => text.setValue(this.plugin.settings.apiUrl).onChange(async (value) => {
-      this.plugin.settings.apiUrl = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian7.Setting(containerEl).setName("API Key").setDesc("API key for authentication (if required).").addText((text) => text.setValue(this.plugin.settings.apiKey).setPlaceholder("your-api-key").onChange(async (value) => {
-      this.plugin.settings.apiKey = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian7.Setting(containerEl).setName("Test Connection").setDesc("Test the connection to your LLM API.").addButton((button) => button.setButtonText("Test Connection").onClick(async () => {
-      const connectionTest = await this.plugin.testConnection();
-      if (connectionTest) {
-        new import_obsidian7.Notice("Connection successful!");
-        const models = await this.plugin.fetchAvailableModels();
-        this.plugin.availableModels = models;
-        this.updateModelDropdown();
-      } else {
-        new import_obsidian7.Notice("Connection failed. Please check your API URL and key.");
-      }
-    }));
-    const modelSetting = new import_obsidian7.Setting(containerEl).setName("LLM Model").setDesc("Select which LLM model to use for task assessment.");
-    this.modelDropdown = document.createElement("select");
-    this.modelDropdown.classList.add("dropdown");
-    this.modelDropdown.value = this.plugin.settings.selectedLLMModel;
-    this.modelDropdown.addEventListener("change", async () => {
-      this.plugin.settings.selectedLLMModel = this.modelDropdown.value;
-      await this.plugin.saveSettings();
-    });
-    const defaultOption = document.createElement("option");
-    defaultOption.value = this.plugin.settings.selectedLLMModel;
-    defaultOption.text = this.plugin.settings.selectedLLMModel;
-    this.modelDropdown.appendChild(defaultOption);
-    try {
-      const models = await this.plugin.fetchAvailableModels();
-      if (models && models.length > 0) {
-        this.plugin.availableModels = models;
-        this.updateModelDropdown();
-      }
-    } catch (error) {
-      console.error("Error loading models:", error);
-    }
-    modelSetting.controlEl.appendChild(this.modelDropdown);
-    containerEl.createEl("h2", { text: "Progress" });
-    if (this.plugin.statCardData) {
-      const progressDiv = containerEl.createDiv();
-      progressDiv.innerHTML = `
-				<div style="padding: 15px; border: 2px solid var(--background-modifier-border); border-radius: 8px; margin-bottom: 15px; background: var(--background-secondary); box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.1); font-family: 'Montserrat', sans-serif; color: var(--text-normal);">
-					
-					<!-- Core Stats Section with User Favicon -->
-					<div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: var(--background-modifier-hover); border-radius: 6px;">
-						<div style="display: flex; flex-direction: column;">
-							<p><strong>Level:</strong> ${this.plugin.statCardData.level || 1}</p>
-							<p><strong>XP:</strong> ${Math.floor(this.plugin.statCardData.xp || 0)} / ${this.plugin.statCardData.nextLevelXp || 100}</p>
-							<p><strong>Points:</strong> ${this.plugin.statCardData.points || 0}</p>
-						</div>
-						<div style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; background: var(--background-modifier-border); display: flex; align-items: center; justify-content: center;">
-							<div style="width: 50px; height: 50px; border-radius: 50%; background: var(--background-modifier-border); display: flex; align-items: center; justify-content: center;">
-							</div>
-						</div>
-					</div>
-
-					<!-- Skills Section (Collapsible) -->
-					<details style="margin-top: 10px;">
-						<summary style="font-weight: bold; cursor: pointer;">Skills</summary>
-						<ul style="padding-left: 15px; list-style: none;">
-							${this.plugin.statCardData.skills.map((skill) => `
-								<li style="background: var(--background-modifier-hover); padding: 6px; margin: 3px 0; border-radius: 4px; border: 1px solid var(--background-modifier-border);"> <strong>${skill.name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</strong> (Level ${skill.level} - XP: ${skill.xp})</li>
-							`).join("")}
-						</ul>
-					</details>
-
-					<!-- Grouped Stats Section -->
-					<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; margin-top: 10px;">
-						<div style="flex: 1; min-width: 140px; background: var(--background-modifier-hover); padding: 8px; border-radius: 6px;">
-							<p><strong>Tasks Completed:</strong> ${((_b = (_a = this.plugin.statCardData) == null ? void 0 : _a.stats) == null ? void 0 : _b.tasksCompleted) || 0}</p>
-							<p><strong>Total Points Earned:</strong> ${((_c = this.plugin.statCardData.stats) == null ? void 0 : _c.totalPointsEarned) || 0}</p>
-						</div>
-						<div style="flex: 1; min-width: 140px; background: var(--background-modifier-hover); padding: 8px; border-radius: 6px;">
-							<p><strong>Highest Difficulty:</strong> ${((_d = this.plugin.statCardData.stats) == null ? void 0 : _d.highestDifficulty) || 0}</p>
-							<p><strong>File/Folder Counts:</strong> ${((_e = this.plugin.statCardData.stats) == null ? void 0 : _e.lastFileCount) || 0} / ${((_f = this.plugin.statCardData.stats) == null ? void 0 : _f.lastFolderCount) || 0}</p>
-						</div>
-					</div>
-
-					<!-- Owned Items and Titles Section -->
-					<div style="margin-top: 10px; background: var(--background-modifier-hover); padding: 8px; border-radius: 6px;">
-						<strong>Owned Items:</strong> 
-						${this.plugin.statCardData.items.length ? this.plugin.statCardData.items.map((oitem) => `
-							<span 
-								class="oitem-tooltip" 
-								item="${oitem.description}
-Unlocked At: ${new Date(oitem.unlockedAt).toLocaleString()}"
-							>
-								${oitem.name}
-							</span>
-						`).join(", ") : "None"}
-					</p>
-					<style>
-						.oitem-tooltip {
-							text-decoration: bold;
-							cursor: help;
-							position: relative;
-						}
-					</style>						
-					<p>
-						<strong>Titles:</strong> 
-						${this.plugin.statCardData.titles.length ? this.plugin.statCardData.titles.map((title) => `
-							<span 
-								class="title-tooltip" 
-								title="${title.description}
-Effects: ${title.effect.join(", ")}
-Unlocked At: ${new Date(title.unlockedAt).toLocaleString()}"
-							>
-								${title.name}
-							</span>
-						 `).join(", ") : "None"}
-					</p>
-
-					<style>
-						.title-tooltip {
-							text-decoration: underline;
-							cursor: help;
-							position: relative;
-						}
-					</style>
-					</div>
-
-					<!-- Active Theme and Effects Section (Collapsible) -->
-					<details style="margin-top: 10px;">
-						<summary style="font-weight: bold; cursor: pointer;">Active Theme & Effects</summary>
-						<div style="background: var(--background-modifier-hover); padding: 8px; border-radius: 6px; margin-top: 5px;">
-							<p><strong>Active Theme:</strong> ${this.plugin.statCardData.activeTheme ? this.plugin.statCardData.activeTheme.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "None"}</p>
-							<p><strong>Active Effects:</strong> ${((_g = this.plugin.statCardData.activeEffects) == null ? void 0 : _g.xpMultiplier) ? `XP Multiplier: ${this.plugin.statCardData.activeEffects.xpMultiplier.value} (Expires: ${new Date(this.plugin.statCardData.activeEffects.xpMultiplier.expiresAt).toLocaleString()})` : "None"}</p>
-						</div>
-					</details>
-				</div>
-			`;
-    } else {
-      containerEl.createEl("p", {
-        text: "Progress data not available. Please initialize the plugin first."
-      });
-    }
-    containerEl.createEl("h2", { text: "Achievements" });
-    const allAchievements = [...this.plugin.defaultAchievements, ...this.plugin.customAchievements];
-    allAchievements.forEach((achievement) => {
-      const isUnlocked = this.plugin.statCardData.achievements.some((a) => a.id === achievement.id);
-      const achievementDiv = containerEl.createDiv("achievement-item");
-      achievementDiv.createEl("strong", { text: achievement.name });
-      achievementDiv.createEl("p", { text: achievement.description });
-      if (isUnlocked) {
-        achievementDiv.addClass("unlocked");
-      } else {
-        achievementDiv.addClass("locked");
-      }
-    });
-    containerEl.createEl("h2", { text: "Task Streaks" });
-    const currentStreakEl = containerEl.createEl("p", {
-      text: `Current Streak: ${this.plugin.statCardData.streaks.currentStreak} days`,
-      cls: "gamify-streak-text"
-    });
-    const longestStreakEl = containerEl.createEl("p", {
-      text: `Longest Streak: ${this.plugin.statCardData.streaks.longestStreak} days`,
-      cls: "gamify-streak-text"
-    });
-    new import_obsidian7.Setting(containerEl).setName("Enable Inventory Tab").setDesc("Display the inventory tab (requires the Infinite Inventory item)").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableInventoryTab).onChange(async (value) => {
-      this.plugin.settings.enableInventoryTab = value;
-      await this.plugin.saveSettings();
-      if (value && this.plugin.hasInfiniteInventory()) {
-        this.plugin.activateInventoryTab();
-      } else {
-        this.app.workspace.detachLeavesOfType("inventory-view");
-      }
-    }));
-    new import_obsidian7.Setting(containerEl).setName("Reset Completed Tasks").setDesc("Clear the list of completed tasks.").addButton((button) => {
-      button.setButtonText("Reset Task Completion Count").setWarning();
-      if (!this.hasSystemControlAccess()) {
-        button.setDisabled(true);
-        button.buttonEl.title = "Permission Required.";
-      } else {
-        button.onClick(async () => {
-          if (this.plugin.statCardData && this.plugin.statCardData.stats) {
-            const confirm2 = await new Promise((resolve) => {
-              const modal = new ConfirmationModal(
-                this.app,
-                "Reset Completed Tasks",
-                "Are you sure you want to reset completed tasks? This cannot be undone!",
-                resolve
-              );
-              modal.open();
-            });
-            if (confirm2) {
-              this.plugin.statCardData.stats.tasksCompleted = 0;
-              await this.plugin.saveStatCardData();
-              this.display();
-              new import_obsidian7.Notice("Task completion history has been reset.");
-              this.plugin.statCardService.refreshUI();
-            }
-          } else {
-            new import_obsidian7.Notice("Stats data not available.");
-          }
-        });
-      }
-    });
-    new import_obsidian7.Setting(containerEl).setName("Reset Progress").setDesc("Warning: This will reset all your progress!").addButton((button) => button.setButtonText("Reset All Progress").setWarning().onClick(async () => {
-      const confirm2 = await new Promise((resolve) => {
-        const modal = new ConfirmationModal(
-          this.app,
-          "Reset Progress",
-          "Are you sure you want to reset all progress? This cannot be undone!",
-          resolve
-        );
-        modal.open();
-      });
-      if (confirm2) {
-        this.plugin.initializeDefaultStatCardData();
-        await this.plugin.saveStatCardData();
-        this.display();
-        new import_obsidian7.Notice("All progress has been reset.");
-        this.plugin.statCardService.refreshUI();
-      }
-    }));
-    containerEl.createEl("h2", { text: "Debug Settings" });
-    new import_obsidian7.Setting(containerEl).setName("Enable Debug Mode").setDesc('Enables debug features when you have the "debugger" title.').addToggle((toggle) => {
-      toggle.setValue(this.plugin.settings.debugMode);
-      if (!this.hasSystemControlAccess()) {
-        toggle.setDisabled(true);
-        toggle.toggleEl.title = "Permission Required.";
-      } else {
-        toggle.onChange(async (value) => {
-          this.plugin.settings.debugMode = value;
-          await this.plugin.saveSettings();
-        });
-      }
-    });
-    if (this.plugin.settings.debugMode) {
-      const debugDesc = containerEl.createEl("div", {
-        cls: "setting-item-description",
-        text: 'Debug mode is enabled. Acquire the "debugger" title to access debug menu via ribbon icon or command palette.'
-      });
-      if (this.plugin.hasDebugPermission()) {
-        const openDebugBtn = containerEl.createEl("button", {
-          text: "Open Debug Menu",
-          cls: "mod-cta"
-        });
-        openDebugBtn.style.marginTop = "10px";
-        openDebugBtn.addEventListener("click", () => {
-          new DebugMenu(this.app, this.plugin).open();
-        });
-      } else {
-        const warningDiv = containerEl.createEl("div", {
-          cls: "setting-item-description",
-          text: 'You need the "debugger" title to access debug features.'
-        });
-        warningDiv.style.color = "var(--text-error)";
-      }
-    }
-  }
-  updateModelDropdown() {
-    if (!this.modelDropdown) return;
-    while (this.modelDropdown.firstChild) {
-      this.modelDropdown.removeChild(this.modelDropdown.firstChild);
-    }
-    if (this.plugin.availableModels && this.plugin.availableModels.length > 0) {
-      this.plugin.availableModels.forEach((model) => {
-        const option = document.createElement("option");
-        option.value = model.id;
-        option.text = model.id;
-        if (model.id === this.plugin.settings.selectedLLMModel) {
-          option.selected = true;
-        }
-        this.modelDropdown.appendChild(option);
-      });
-      if (!this.plugin.availableModels.some((m) => m.id === this.plugin.settings.selectedLLMModel)) {
-        const option = document.createElement("option");
-        option.value = this.plugin.settings.selectedLLMModel;
-        option.text = this.plugin.settings.selectedLLMModel + " (not found)";
-        option.selected = true;
-        this.modelDropdown.appendChild(option);
-      }
-    } else {
-      const option = document.createElement("option");
-      option.value = this.plugin.settings.selectedLLMModel;
-      option.text = this.plugin.settings.selectedLLMModel;
-      this.modelDropdown.appendChild(option);
-    }
-  }
-};
-var SelectNoteModal = class extends import_obsidian7.Modal {
+var SelectNoteModal = class extends import_obsidian15.Modal {
   constructor(app, options, onSelect) {
     super(app);
     this.options = options;
@@ -3894,234 +4893,5 @@ var SelectNoteModal = class extends import_obsidian7.Modal {
   onClose() {
     const { contentEl } = this;
     contentEl.empty();
-  }
-};
-var ConfirmationModal = class extends import_obsidian7.Modal {
-  constructor(app, title, message, result) {
-    super(app);
-    this.result = result;
-    this.message = message;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.createEl("h2", { text: "Confirmation" });
-    contentEl.createEl("p", { text: this.message });
-    const buttonContainer = contentEl.createDiv();
-    buttonContainer.addClass("modal-button-container");
-    const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
-    cancelButton.addEventListener("click", () => {
-      this.result(false);
-      this.close();
-    });
-    const confirmButton = buttonContainer.createEl("button", { text: "Confirm" });
-    confirmButton.addClass("mod-warning");
-    confirmButton.addEventListener("click", () => {
-      this.result(true);
-      this.close();
-    });
-  }
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
-  }
-};
-var DebugMenu = class extends import_obsidian7.Modal {
-  constructor(app, plugin) {
-    super(app);
-    this.plugin = plugin;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.createEl("h2", { text: "Debug Menu" });
-    this.createStatsSection(contentEl);
-    this.createSkillsSection(contentEl);
-    this.createItemsSection(contentEl);
-    this.createStatsManipulationSection(contentEl);
-    this.createTitlesSection(contentEl);
-    this.createDebugTools(contentEl);
-    const saveBtn = contentEl.createEl("button", {
-      text: "Save All Changes",
-      cls: "mod-cta debug-button"
-    });
-    saveBtn.style.marginTop = "20px";
-    saveBtn.addEventListener("click", async () => {
-      await this.plugin.saveStatCardData();
-      new import_obsidian7.Notice("Debug changes saved successfully!");
-      this.close();
-    });
-  }
-  createStatsSection(parent) {
-    const section = parent.createDiv("debug-section");
-    section.createEl("h3", { text: "Core Stats" });
-    this.createStatControl(section, "XP", () => this.plugin.statCardData.xp, (val) => {
-      this.plugin.statCardData.xp = val;
-      this.plugin.checkForLevelUp();
-    });
-    this.createStatControl(section, "Level", () => this.plugin.statCardData.level, (val) => {
-      this.plugin.statCardData.level = val;
-      this.plugin.statCardData.nextLevelXp = Math.round(100 * Math.pow(1.1 + val * 0.05, val - 1));
-    });
-    this.createStatControl(section, "Points", () => this.plugin.statCardData.points, (val) => {
-      this.plugin.statCardData.points = val;
-    });
-  }
-  createSkillsSection(parent) {
-    const section = parent.createDiv("debug-section");
-    section.createEl("h3", { text: "Skills" });
-    const skillSelector = section.createEl("select");
-    this.plugin.statCardData.skills.forEach((skill) => {
-      const option = skillSelector.createEl("option");
-      option.value = skill.id;
-      option.text = skill.name;
-    });
-    const selectedSkillDiv = section.createDiv("selected-skill-controls");
-    const updateSelectedSkillControls = () => {
-      const selectedSkillId = skillSelector.value;
-      const selectedSkill = this.plugin.statCardData.skills.find((s) => s.id === selectedSkillId);
-      if (!selectedSkill) return;
-      selectedSkillDiv.empty();
-      this.createStatControl(selectedSkillDiv, "Skill Level", () => selectedSkill.level, (val) => selectedSkill.level = val);
-      this.createStatControl(selectedSkillDiv, "Skill XP", () => selectedSkill.xp, (val) => selectedSkill.xp = val);
-    };
-    skillSelector.addEventListener("change", updateSelectedSkillControls);
-    updateSelectedSkillControls();
-  }
-  createItemsSection(parent) {
-    const section = parent.createDiv("debug-section");
-    section.createEl("h3", { text: "Owned Items" });
-    const itemInputContainer = section.createDiv("item-input-container");
-    const itemInput = itemInputContainer.createEl("input", {
-      type: "text",
-      placeholder: "Enter item id to add"
-    });
-    const addItemButton = itemInputContainer.createEl("button", { text: "Add Item", cls: "debug-button" });
-    addItemButton.addEventListener("click", () => {
-      const itemId = itemInput.value.trim();
-      if (itemId && !this.plugin.statCardData.ownedItems.includes(itemId)) {
-        this.plugin.statCardData.ownedItems.push(itemId);
-        this.renderOwnedItems(itemsListDiv);
-        itemInput.value = "";
-      }
-    });
-    const itemsListDiv = section.createDiv("items-list");
-    this.renderOwnedItems(itemsListDiv);
-  }
-  createStatsManipulationSection(parent) {
-    const section = parent.createDiv("debug-section");
-    section.createEl("h3", { text: "Stats & Counters" });
-    this.createStatControl(section, "Tasks Completed", () => this.plugin.statCardData.stats.tasksCompleted, (val) => this.plugin.statCardData.stats.tasksCompleted = val);
-    this.createStatControl(section, "Total Points Earned", () => this.plugin.statCardData.stats.totalPointsEarned, (val) => this.plugin.statCardData.stats.totalPointsEarned = val);
-  }
-  createTitlesSection(parent) {
-    const section = parent.createDiv("debug-section");
-    section.createEl("h3", { text: "Manage Titles" });
-    const titleIdInput = section.createEl("input", { type: "text", placeholder: "Enter Title ID" });
-    const titleNameInput = section.createEl("input", { type: "text", placeholder: "Enter Title Name" });
-    const titleDescInput = section.createEl("input", { type: "text", placeholder: "Enter Title Description" });
-    const addTitleButton = section.createEl("button", { text: "Add Title", cls: "debug-button" });
-    addTitleButton.addEventListener("click", () => {
-      const id = titleIdInput.value.trim();
-      const name = titleNameInput.value.trim();
-      const description = titleDescInput.value.trim();
-      if (!id || !name || !description) {
-        new import_obsidian7.Notice("Please fill in all fields before adding a title.");
-        return;
-      }
-      if (this.plugin.statCardData.titles.some((title) => title.id === id)) {
-        new import_obsidian7.Notice(`Title "${name}" already exists.`);
-        return;
-      }
-      const newTitle = {
-        id,
-        name,
-        description,
-        unlockedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        effect: []
-      };
-      this.plugin.statCardData.titles.push(newTitle);
-      this.renderTitlesList(titlesListDiv);
-      titleIdInput.value = "";
-      titleNameInput.value = "";
-      titleDescInput.value = "";
-    });
-    const titlesListDiv = section.createDiv("titles-list");
-    this.renderTitlesList(titlesListDiv);
-  }
-  createDebugTools(parent) {
-    const section = parent.createDiv("debug-section");
-    section.createEl("h3", { text: "Debug Tools" });
-    const forceSaveBtn = section.createEl("button", { text: "Force Save Data", cls: "debug-button" });
-    forceSaveBtn.addEventListener("click", async () => {
-      await this.plugin.saveStatCardData();
-      new import_obsidian7.Notice("Data force-saved successfully");
-    });
-  }
-  createStatControl(containerEl, label, getValue, setValue) {
-    const controlDiv = containerEl.createDiv("stat-control");
-    const labelEl = controlDiv.createEl("span", { text: label, cls: "stat-label" });
-    const buttonContainer = controlDiv.createDiv("stat-button-container");
-    const buttons = [
-      { text: "-10", change: -10, cls: "decrease-button" },
-      { text: "-1", change: -1, cls: "decrease-button" },
-      { text: "+1", change: 1, cls: "increase-button" },
-      { text: "+10", change: 10, cls: "increase-button" }
-    ];
-    const leftButtonGroup = buttonContainer.createDiv("stat-button-group");
-    buttons.slice(0, 2).forEach(({ text, change, cls }) => {
-      const btn = leftButtonGroup.createEl("button", { text, cls: `debug-button ${cls}` });
-      btn.addEventListener("click", () => {
-        const newVal = Math.max(0, getValue() + change);
-        setValue(newVal);
-        valueSpan.textContent = `${newVal}`;
-      });
-    });
-    const valueSpan = buttonContainer.createEl("span", { text: `${getValue()}`, cls: "stat-value" });
-    const rightButtonGroup = buttonContainer.createDiv("stat-button-group");
-    buttons.slice(2).forEach(({ text, change, cls }) => {
-      const btn = rightButtonGroup.createEl("button", { text, cls: `debug-button ${cls}` });
-      btn.addEventListener("click", () => {
-        const newVal = Math.max(0, getValue() + change);
-        setValue(newVal);
-        valueSpan.textContent = `${newVal}`;
-      });
-    });
-  }
-  renderOwnedItems(containerEl) {
-    containerEl.empty();
-    this.plugin.statCardData.ownedItems.forEach((itemId) => {
-      const div = containerEl.createDiv("owned-item");
-      div.createEl("span", { text: itemId });
-      const removeBtn = div.createEl("button", { text: "Remove", cls: "debug-button" });
-      removeBtn.addEventListener("click", () => {
-        this.plugin.statCardData.ownedItems = this.plugin.statCardData.ownedItems.filter((id) => id !== itemId);
-        this.renderOwnedItems(containerEl);
-      });
-    });
-  }
-  renderTitlesList(containerEl) {
-    containerEl.empty();
-    if (this.plugin.statCardData.titles.length === 0) {
-      containerEl.createEl("p", { text: "No titles unlocked yet.", cls: "debug-empty-message" });
-      return;
-    }
-    this.plugin.statCardData.titles.forEach((title) => {
-      const titleDiv = containerEl.createDiv("title-item");
-      titleDiv.createEl("h4", { text: title.name });
-      titleDiv.createEl("p", { text: title.description, cls: "title-description" });
-      const unlockDate = new Date(title.unlockedAt).toLocaleDateString();
-      titleDiv.createEl("p", { text: `Unlocked on: ${unlockDate}`, cls: "title-unlock-date" });
-      if (title.effect.length > 0) {
-        const effectsList = titleDiv.createEl("ul", { cls: "title-effects-list" });
-        title.effect.forEach((effect) => {
-          effectsList.createEl("li", { text: effect });
-        });
-      }
-      const removeBtn = titleDiv.createEl("button", { text: "Remove", cls: "debug-button" });
-      removeBtn.addEventListener("click", () => {
-        this.plugin.statCardData.titles = this.plugin.statCardData.titles.filter((t) => t.id !== title.id);
-        this.renderTitlesList(containerEl);
-      });
-      titleDiv.appendChild(removeBtn);
-    });
   }
 };
