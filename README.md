@@ -77,7 +77,7 @@ Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-
 - **AI Summoning System**: Redeem earned points for AI-generated insights or tasks.
 
 ## Installation 🔧
-1. Clone the repo into your Obsidian `plugins` folder.
+1. Clone the repo into your Obsidian `plugins` folder OR use the BRAT plugin.
 2. Enable the plugin in Obsidian’s settings.
 3. Configure XP, point values, and API settings in the plugin settings menu.
 
