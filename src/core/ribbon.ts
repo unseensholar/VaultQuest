@@ -5,6 +5,7 @@ import { DebugMenu } from '../debug/DebugMenu';
 import GamifyPlugin from '../main';
 import { ACHIEVEMENT_VIEW_TYPE, AchievementsService } from '../features/achievements';
 import { NotificationListener, NotificationModal } from '../support/notificationListener';
+import { ItemCrafterModal } from '../features/itemCrafter';
 
 export class RibbonManager {
     private plugin: GamifyPlugin;
@@ -50,8 +51,9 @@ export class RibbonManager {
 		
         if (this.plugin.settings.ribbonButtons.notifications) {
             this.addNotificationsButton();
-        }		
-		
+        }
+
+		this.addCrafterButton()
     }
 
     updateRibbonIcons() {
@@ -132,7 +134,12 @@ export class RibbonManager {
             (this.plugin.app as any).plugins.enablePlugin(this.plugin.manifest.id);
         });
     }
-
+    private async addCrafterButton() {	
+        this.addRibbonIconWithTracking('hammer', 'Open Item Crafter', () => {
+            new ItemCrafterModal(this.plugin.app, this.plugin).open();
+        });	
+	}
+	
     private async addSettingsButton() {
         this.addRibbonIconWithTracking("settings", "Open Plugin Settings", () => {
             (this.plugin.app as any).setting.open();

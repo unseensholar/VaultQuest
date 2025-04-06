@@ -2,36 +2,41 @@ import { App, Notice, Modal, ButtonComponent, DropdownComponent } from 'obsidian
 import GamifyPlugin from '../main';
 import { RedeemTaskModal } from '../core/CoreServices';
 import { initializeStoreItems } from '../features/initializeStoreItems';
-
+import { EffectType, EffectParams, EffectService} from '../features/effectService';
 
 export interface StoreItem {
     id: string;
     name: string;
     description: string;
     cost: number;
-    category: 'boost' | 'ritual' | 'artifact' | 'cosmetic';
-    effect: (plugin: GamifyPlugin) => void;
-    imagePath?: string;
+    category: 'boost' | 'ritual' | 'artifact' | 'cosmetic' | 'material';
     owned: boolean;
     levelRequired?: number;     
     skillRequired?: {          
         skillId: string;
         level: number;
     };
-    hidden?: boolean;          
+    hidden?: boolean;
+    imagePath?: string;
+    
+    effectType: EffectType;
+    effectParams?: EffectParams;
+    
+    effect?: (plugin: GamifyPlugin) => void;
 }
-
 export class ItemStoreService {
     private plugin: GamifyPlugin;
     private items: StoreItem[] = [];
     private debugMode: boolean = false;
+    private effectService: EffectService;
 
     constructor(plugin: GamifyPlugin) {
         this.plugin = plugin;
+        this.effectService = new EffectService(plugin);
         this.initializeStore();
     }
 
-    private async initializeStore() {
+    async initializeStore() {
         this.items = await initializeStoreItems(this.plugin);
         this.syncOwnedItems();
     }
@@ -131,8 +136,13 @@ export class ItemStoreService {
             new Notice(`You do not meet the requirements: ${this.getRequirementText(item)}`);
             return false;
         }
-        
-        this.plugin.statCardData.points -= item.cost;
+		
+        if (this.plugin.statCardData.activeEffects.storeDiscount) {
+			const discountPercent = Math.round(this.plugin.statCardData.activeEffects.storeDiscount.value* 100);
+			new Notice(`Discount active: ${discountPercent}%!`);	this.plugin.statCardData.points -= Math.round(item.cost*(1-(discountPercent/100)));
+        } else {
+        this.plugin.statCardData.points -= item.cost;			
+		}
           
         if (item.category === 'artifact') {
             item.owned = true;
@@ -164,7 +174,8 @@ export class ItemStoreService {
             }
         }
  
-        item.effect(this.plugin);
+        this.applyItemEffect(item);
+        
         this.plugin.checkForLevelUp();
 
         this.plugin.statCardData.stats.itemsPurchased = 
@@ -174,6 +185,28 @@ export class ItemStoreService {
         await this.plugin.statCardService.refreshUI();
         return true;
     }
+
+	private applyItemEffect(item: StoreItem): void {
+		try {
+			// First try the new effect system
+			if (item.effectType) {
+				this.effectService.applyEffect(item.effectType, item.effectParams || {});
+				return;
+			}
+			
+			// Fall back to legacy effect function if available
+			if (item.effect && typeof item.effect === 'function') {
+				item.effect(this.plugin);
+				return;
+			}
+			
+			// If neither is available, show a generic notice
+			new Notice(`You have acquired: ${item.name}`);
+		} catch (error) {
+			console.error("Error applying item effect:", error);
+			new Notice(`Error applying effect for item: ${item.name}`);
+		}
+	}
 }
 
 export class ItemStoreModal extends Modal {
@@ -189,6 +222,7 @@ export class ItemStoreModal extends Modal {
     }
     
     onOpen() {
+
         const {contentEl} = this;
         contentEl.empty();
         contentEl.addClass('gamify-store-modal');
@@ -204,7 +238,7 @@ export class ItemStoreModal extends Modal {
         
         const itemsContainer = contentEl.createDiv({cls: 'gamify-store-items'});
         itemsContainer.id = 'store-items-container';
-        
+		this.storeService.initializeStore();
         this.renderItems();
         contentEl.createDiv({cls: 'gamify-store-buttons'});
     }
@@ -222,6 +256,7 @@ export class ItemStoreModal extends Modal {
         categoryDropdown.addOption('ritual', 'Rituals');
         categoryDropdown.addOption('artifact', 'Artifacts');
         categoryDropdown.addOption('cosmetic', 'Cosmetics');
+        categoryDropdown.addOption('material', 'Materials');
         
         categoryDropdown.setValue(this.selectedCategory);
         categoryDropdown.onChange(value => {
@@ -293,7 +328,8 @@ export class ItemStoreModal extends Modal {
             'boost': 'Boost',
             'ritual': 'Ritual',
             'artifact': 'Artifact',
-            'cosmetic': 'Cosmetic Upgrade'
+            'cosmetic': 'Cosmetic Upgrade',
+            'material': 'Material'			
         };
         
         itemEl.createEl('span', {

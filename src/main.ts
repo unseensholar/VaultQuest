@@ -5,6 +5,7 @@ import { StatCardService, StatCardModal } from './features/StatCardService';
 import { TaskAssessmentService } from './features/task-assessment-service';
 import { TaskStorageRibbonIcon, TaskStorageViewer, TASK_STORAGE_VIEW_TYPE } from './views/task-storage-viewer';
 import { ItemStoreService, ItemStoreModal } from './features/itemStore';
+import { ItemCrafterModal } from './features/itemCrafter';
 import { ProcessingIndicatorService } from './support/indicator';
 import { InventoryTabView } from './views/inventory';
 import { DebugMenu } from './debug/DebugMenu';
@@ -175,6 +176,16 @@ export default class GamifyPlugin extends Plugin {
 			await this.notificationListener.loadNotifications();
 			this.notificationListener.initialize();
 
+
+			this.addCommand({
+				id: 'open-item-crafter',
+				name: 'Open Item Crafter',
+				callback: () => {
+					new ItemCrafterModal(this.app, this).open();
+				}
+			});
+
+			
 			this.addCommand({
 			  id: 'open-notification-history',
 			  name: 'Show Notification History',

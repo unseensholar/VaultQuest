@@ -1,8 +1,7 @@
 import { Notice } from 'obsidian';
 import GamifyPlugin from '../main';
 import { StoreItem } from '../features/itemStore';
-import { RedeemTaskModal } from '../core/CoreServices';
-
+import { EffectType, EffectParams } from '../features/effectService';
 
 export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreItem[]> {
     const items: StoreItem[] = [
@@ -14,10 +13,11 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'artifact',
             owned: false,
             levelRequired: 1,
-            hidden: false,  
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('You can now access the store from the inventory!');
-            }                
+            hidden: false,
+            effectType: 'enable_feature',
+            effectParams: {
+                featureId: 'store_app'
+            }
         },
         {
             id: 'theme_toggler',
@@ -27,10 +27,11 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'cosmetic',
             owned: false,
             levelRequired: 1,
-            hidden: false,  
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('You can now change themes from the stats menu!');
-            }                
+            hidden: false,
+            effectType: 'enable_feature',
+            effectParams: {
+                featureId: 'theme_toggler'
+            }
         },
         {
             id: 'mysterious_tablet',
@@ -40,11 +41,13 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'artifact',
             owned: false,
             levelRequired: 0,
-            effect: (plugin: GamifyPlugin) => {
-                new RedeemTaskModal(plugin.app, plugin).open();
-                new Notice('A mysterious tablet falls into your hands. A new icon appears in the Ribbon. A new command enters your mind.');
+            effectType: 'custom',
+            effectParams: {
+                customCode: `
+					new Notice('A mysterious tablet falls into your hands. A new icon appears in the Ribbon. A new command enters your mind.');
+                `
             }
-        },		
+        },
         {
             id: 'minor_xp_boost',
             name: 'Experience Potion (Minor)',
@@ -53,9 +56,9 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'boost',
             owned: false,
             levelRequired: 0,
-            effect: (plugin: GamifyPlugin) => {
-                plugin.statCardData.xp += 100;
-                new Notice('Your soul absorbs the energy, growing stronger...');
+            effectType: 'xp_boost',
+            effectParams: {
+                value: 100
             }
         },
         {
@@ -66,10 +69,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'boost',
             owned: false,
             levelRequired: 10,
-            hidden: true, 
-            effect: (plugin: GamifyPlugin) => {
-                plugin.statCardData.xp += 500;
-                new Notice('A surge of power courses through your essence!');
+            hidden: true,
+            effectType: 'xp_boost',
+            effectParams: {
+                value: 500
             }
         },
         {
@@ -81,12 +84,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             owned: false,
             skillRequired: { skillId: "writing", level: 2 },
             hidden: false,
-            effect: (plugin: GamifyPlugin) => {
-                const skill = plugin.statCardData.skills.find(s => s.id === "writing");
-                if (skill) {
-                    skill.level += 1;
-                    new Notice('Your Writing skill has been augmented!');
-                }
+            effectType: 'skill_boost',
+            effectParams: {
+                skillId: "writing",
+                value: 1
             }
         },
         {
@@ -98,12 +99,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             owned: false,
             skillRequired: { skillId: "research", level: 2 },
             hidden: false,
-            effect: (plugin: GamifyPlugin) => {
-                const skill = plugin.statCardData.skills.find(s => s.id === "research");
-                if (skill) {
-                    skill.level += 1;
-                    new Notice('Your Research skill has been infused with eldritch wisdom!');
-                }
+            effectType: 'skill_boost',
+            effectParams: {
+                skillId: "research",
+                value: 1
             }
         },
         {
@@ -115,12 +114,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             owned: false,
             skillRequired: { skillId: "organization", level: 2 },
             hidden: false,
-            effect: (plugin: GamifyPlugin) => {
-                const skill = plugin.statCardData.skills.find(s => s.id === "organization");
-                if (skill) {
-                    skill.level += 1;
-                    new Notice('Your Organization skill has been enhanced with supernatural precision!');
-                }
+            effectType: 'skill_boost',
+            effectParams: {
+                skillId: "organization",
+                value: 1
             }
         },
         {
@@ -132,13 +129,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             owned: false,
             levelRequired: 10,
             hidden: false,
-            effect: (plugin: GamifyPlugin) => {
-                plugin.statCardData.activeEffects = plugin.statCardData.activeEffects || {};
-                plugin.statCardData.activeEffects.storeDiscount = {
-                    value: 0.2, // 20% discount
-                    expiresAt: Date.now() + (24 * 60 * 60 * 1000)
-                };
-                new Notice('A discount... how quaint...');
+            effectType: 'store_discount',
+            effectParams: {
+                value: 0.2,
+                duration: 24
             }
         },
         {
@@ -149,11 +143,12 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'cosmetic',
             owned: false,
             levelRequired: 5,
-            hidden: false,  
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('You hear the echoes of demonic screams.');
+            hidden: false,
+            effectType: 'custom',
+            effectParams: {
+                customCode: `new Notice('You hear the echoes of demonic screams.');`
             }
-        },			
+        },
         {
             id: 'celestial_theme',
             name: 'Celestial Codex',
@@ -162,9 +157,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'cosmetic',
             owned: false,
             levelRequired: 5,
-            hidden: false,  
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('Your interface now shimmers with cosmic brilliance.');
+            hidden: false,
+            effectType: 'custom',
+            effectParams: {
+                customCode: `new Notice('Your interface now shimmers with cosmic brilliance.');`
             }
         },
         {
@@ -175,9 +171,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'cosmetic',
             owned: false,
             levelRequired: 10,
-            hidden: false,  
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('System update complete. Cybernetic enhancements activated.');
+            hidden: false,
+            effectType: 'custom',
+            effectParams: {
+                customCode: `new Notice('System update complete. Cybernetic enhancements activated.');`
             }
         },
         {
@@ -188,9 +185,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'cosmetic',
             owned: false,
             levelRequired: 10,
-            hidden: true,  
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('Arcane glyphs swirl around you as your Tome of Elders awakens.');
+            hidden: true,
+            effectType: 'custom',
+            effectParams: {
+                customCode: `new Notice('Arcane glyphs swirl around you as your Tome of Elders awakens.');`
             }
         },
         {
@@ -201,9 +199,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'cosmetic',
             owned: false,
             levelRequired: 10,
-            hidden: true,  
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('The shadows deepen. You hear whispers in forgotten tongues...');
+            hidden: true,
+            effectType: 'custom',
+            effectParams: {
+                customCode: `new Notice('The shadows deepen. You hear whispers in forgotten tongues...');`
             }
         },
         {
@@ -214,9 +213,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'cosmetic',
             owned: false,
             levelRequired: 10,
-            hidden: true,  
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('You vanish into the shadows, your interface adapting to the underworld.');
+            hidden: true,
+            effectType: 'custom',
+            effectParams: {
+                customCode: `new Notice('You vanish into the shadows, your interface adapting to the underworld.');`
             }
         },
         {
@@ -227,13 +227,10 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'ritual',
             owned: false,
             levelRequired: 15,
-            effect: (plugin: GamifyPlugin) => {
-                plugin.statCardData.activeEffects = plugin.statCardData.activeEffects || {};
-                plugin.statCardData.activeEffects.xpMultiplier = {
-                    value: 1.5,
-                    expiresAt: Date.now() + (24 * 60 * 60 * 1000)
-                };
-                new Notice('Your soul now absorbs more energy from your labors...');
+            effectType: 'xp_multiplier',
+            effectParams: {
+                value: 1.5,
+                duration: 24
             }
         },
         {
@@ -244,12 +241,8 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             category: 'artifact',
             owned: false,
             levelRequired: 50,
-            hidden: false, 
-            effect: (plugin: GamifyPlugin) => {
-                plugin.statCardData.hasFamiliar = true;
-                setupFamiliarDailyBonus(plugin);
-                new Notice('A small creature materializes, bound to your service!');
-            }
+            hidden: false,
+            effectType: 'summon_familiar'
         },
         {
             id: 'infinite_inventory',
@@ -260,8 +253,9 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             owned: false,
             levelRequired: 1,
             hidden: true,
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('You bought an Inventory Box!');
+            effectType: 'enable_feature',
+            effectParams: {
+                featureId: 'infinite_inventory'
             }
         },
         {
@@ -273,21 +267,12 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             owned: false,
             levelRequired: 100,
             hidden: false,
-            effect: (plugin: GamifyPlugin) => {
-                const administratorTitle = {
-                    id: "system_control",
-                    name: "Administrator",
-                    description: "A title given to those with control over the system.",
-                    unlockedAt: new Date().toISOString(),
-                    effect: [
-                        "Grants full access to all system features",
-                        "Allows modification of core settings"
-                    ]
-                };
-                if (!plugin.statCardData.titles.some(title => title.id === "system_control")) {
-                    plugin.statCardData.titles.push(administratorTitle);
-                }
-                new Notice('You have been granted Administrator rights!');
+            effectType: 'unlock_title',
+            effectParams: {
+                titleId: "system_control",
+                titleName: "Administrator",
+                titleDesc: "A title given to those with control over the system.",
+                featureId: "administrator_rights"
             }
         },
         {
@@ -299,21 +284,12 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             owned: false,
             levelRequired: 10,
             hidden: true,
-            effect: (plugin: GamifyPlugin) => {
-                const debuggerTitle = {
-                    id: "debugger",
-                    name: "Debugger",
-                    description: "A title granted to those who uncover and resolve hidden issues.",
-                    unlockedAt: new Date().toISOString(),
-                    effect: [
-                        "Unlocks hidden developer tools"
-                    ]
-                };
-                if (!plugin.statCardData.titles.some(title => title.id === "debugger")) {
-                    plugin.statCardData.titles.push(debuggerTitle);
-                }
-                
-                new Notice('You have been granted Debugger rights!');
+            effectType: 'unlock_title',
+            effectParams: {
+                titleId: "debugger",
+                titleName: "Debugger",
+                titleDesc: "A title granted to those who uncover and resolve hidden issues.",
+                featureId: "debugger_tools"
             }
         },
         {
@@ -325,38 +301,60 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             owned: false,
             levelRequired: 3,
             hidden: false,
-            effect: (plugin: GamifyPlugin) => {
-                new Notice('You have been granted Tag editing rights!');
+            effectType: 'enable_feature',
+            effectParams: {
+                featureId: 'tagger'
             }
-        }
+        },
+		{
+			"id": "experience_stone",
+			"name": "Experience Stone",
+			"description": "A mystical stone required to craft XP Boost items.",
+			"cost": 100,
+			"category": "material",
+			"owned": false,
+			"levelRequired": 20,
+			"effectType": "custom",
+			"effectParams": {}
+		},
+		{
+			"id": "ritual_gem",
+			"name": "Ritual Gem",
+			"description": "A gem imbued with ritual energy, essential for crafting Ritual items.",
+			"cost": 150,
+			"category": "material",
+			"owned": false,
+			"levelRequired": 15,
+			"effectType": "custom",
+			"effectParams": {}
+		},
+		{
+			"id": "component",
+			"name": "Component",
+			"description": "A vital component required to craft Artifact items.",
+			"cost": 200,
+			"category": "material",
+			"owned": false,
+			"levelRequired": 10,
+			"effectType": "custom",
+			"effectParams": {}
+		},
+		{
+			"id": "container",
+			"name": "Container",
+			"description": "A specialized container used in the crafting of Cosmetic items.",
+			"cost": 50,
+			"category": "material",
+			"owned": false,
+			"levelRequired": 0,
+			"effectType": "custom",
+			"effectParams": {}
+		}		
     ];
     
     await loadCustomItems(plugin, items);
     
     return items;
-}
-
-function setupFamiliarDailyBonus(plugin: GamifyPlugin) {
-    const now = new Date();
-    const today = now.toDateString();
-    
-    if (plugin.statCardData.lastFamiliarBonusDate !== today) {
-        const bonusType = Math.floor(Math.random() * 2);
-        const randomBonus = Math.floor(Math.random() * 100);
-        
-        switch (bonusType) {
-            case 0:
-                plugin.statCardData.xp += randomBonus;
-                new Notice(`Your familiar brings you a gift of ${randomBonus} XP!`);
-                break;
-            case 1:
-                plugin.statCardData.points += randomBonus;
-                new Notice(`Your familiar has collected ${randomBonus} tokens for you!`);
-                break;
-        }
-        
-        plugin.statCardData.lastFamiliarBonusDate = today;
-    }
 }
 
 async function loadCustomItems(plugin: GamifyPlugin, items: StoreItem[]) {
@@ -368,14 +366,23 @@ async function loadCustomItems(plugin: GamifyPlugin, items: StoreItem[]) {
     for (const file of files) {
         try {
             const content = await plugin.app.vault.read(file);
-            const customItems: StoreItem[] = JSON.parse(content);
+            const customItems: any[] = JSON.parse(content);
 
             customItems.forEach(item => {
                 if (!items.find(existingItem => existingItem.id === item.id)) {
-                    items.push({ 
-                        ...item, 
-                        effect: createEffectFunction(typeof item.effect === 'string' ? item.effect : "")
-                    });
+                    // Convert legacy items to new format if needed
+                    const newItem: StoreItem = {
+                        ...item,
+                        effectType: item.effectType || 'custom',
+                        effectParams: item.effectParams || { customCode: typeof item.effect === 'string' ? item.effect : "" }
+                    };
+                    
+                    // Add legacy effect function for backward compatibility
+                    if (typeof item.effect === 'string') {
+                        newItem.effect = createEffectFunction(item.effect);
+                    }
+                    
+                    items.push(newItem);
                 }
             });
         } catch (error) {
@@ -384,11 +391,13 @@ async function loadCustomItems(plugin: GamifyPlugin, items: StoreItem[]) {
     }
 }
 
+// Maintain for backward compatibility
 function createEffectFunction(effect: string): (plugin: GamifyPlugin) => void {
-    try {
-        return new Function("plugin", effect) as (plugin: GamifyPlugin) => void;
-    } catch (error) {
-        console.error("Invalid effect code in JSON:", error);
-        return () => new Notice("Error executing custom item effect.");
-    }
+    return (plugin: GamifyPlugin) => {
+        try {            
+        } catch (error) {
+            console.error("Invalid effect code in JSON:", error);
+            new Notice("Error executing custom item effect.");
+        }
+    };
 }
