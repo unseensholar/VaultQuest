@@ -81,7 +81,7 @@ Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-
 - **AI Summoning System**: Redeem earned points for AI-generated insights or tasks.
 
 ## Installation 🔧
-1. Clone the repo into your Obsidian `plugins` folder OR use the BRAT plugin.
+1. Download the latest release into your Obsidian `plugins` folder OR use the BRAT plugin.
 2. Enable the plugin in Obsidian’s settings.
 3. Configure XP, point values, and API settings in the plugin settings menu.
 
@@ -120,9 +120,9 @@ Settings are adjustable via the Obsidian plugin settings panel:
 - **API URL & Key** – Configure the AI API endpoint.
 
 ## Data Storage 💾
-- XP, levels, and stats are stored in `VQ/data.json`.
-- Processed tasks are stored in `VQ/tasks.json`.
-- AI-generated responses are saved in the `VQ/` directory.
+- XP, levels, and stats are stored in `QuestLog/data.json`.
+- Processed tasks are stored in `QuestLog/tasks.json`.
+- AI-generated responses are saved in the `QuestLog/` directory.
 
 ## Future Enhancements 🛠️
 - **Achievements & Rewards**
@@ -136,4 +136,4 @@ Settings are adjustable via the Obsidian plugin settings panel:
 
 ## Support me
 
-<a href='https://ko-fi.com/unseenscholar' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi1.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+Your feedback is all I need.
