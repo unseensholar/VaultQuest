@@ -15,6 +15,7 @@ Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-
 ## Changelog
 ### v0.6.0 - Major Feature Update
 - Added Item Crafter - Menu to create items and add them to the store.
+- BRAT support.
 
 ### v0.5.2 - Major Enhancements & UI Overhaul
 
