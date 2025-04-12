@@ -307,48 +307,60 @@ export async function initializeStoreItems(plugin: GamifyPlugin): Promise<StoreI
             }
         },
 		{
-			"id": "experience_stone",
-			"name": "Experience Stone",
-			"description": "A mystical stone required to craft XP Boost items.",
-			"cost": 100,
-			"category": "material",
-			"owned": false,
-			"levelRequired": 20,
-			"effectType": "custom",
-			"effectParams": {}
+			id: "experience_stone",
+			name: "Experience Stone",
+			description: "A mystical stone required to craft XP Boost items.",
+			cost: 100,
+			category: "material",
+			owned: false,
+			levelRequired: 20,
+			effectType: "consumable_material",
+            effectParams: {
+				materialId: "Experience Stone",
+                value: 3
+            }
 		},
 		{
-			"id": "ritual_gem",
-			"name": "Ritual Gem",
-			"description": "A gem imbued with ritual energy, essential for crafting Ritual items.",
-			"cost": 150,
-			"category": "material",
-			"owned": false,
-			"levelRequired": 15,
-			"effectType": "custom",
-			"effectParams": {}
+			id: "ritual_gem",
+			name: "Ritual Gem",
+			description: "A gem imbued with ritual energy, essential for crafting Ritual items.",
+			cost: 150,
+			category: "material",
+			owned: false,
+			levelRequired: 15,
+			effectType: "consumable_material",
+            effectParams: {
+				materialId: "Ritual Gem",
+                value: 3
+            }
 		},
 		{
-			"id": "component",
-			"name": "Component",
-			"description": "A vital component required to craft Artifact items.",
-			"cost": 200,
-			"category": "material",
-			"owned": false,
-			"levelRequired": 10,
-			"effectType": "custom",
-			"effectParams": {}
+			id: "component",
+			name: "Component",
+			description: "A vital component required to craft Artifact items.",
+			cost: 200,
+			category: "material",
+			owned: false,
+			levelRequired: 10,
+			effectType: "consumable_material",
+            effectParams: {
+				materialId: "Component",
+                value: 3
+            }
 		},
 		{
-			"id": "container",
-			"name": "Container",
-			"description": "A specialized container used in the crafting of Cosmetic items.",
-			"cost": 50,
-			"category": "material",
-			"owned": false,
-			"levelRequired": 0,
-			"effectType": "custom",
-			"effectParams": {}
+			id: "container",
+			name: "Container",
+			description: "A specialized container used in the crafting of Cosmetic items.",
+			cost: 50,
+			category: "material",
+			owned: false,
+			levelRequired: 0,
+			effectType: "consumable_material",
+            effectParams: {
+				materialId: "Container",
+                value: 3
+            }
 		}		
     ];
     
@@ -370,14 +382,12 @@ async function loadCustomItems(plugin: GamifyPlugin, items: StoreItem[]) {
 
             customItems.forEach(item => {
                 if (!items.find(existingItem => existingItem.id === item.id)) {
-                    // Convert legacy items to new format if needed
                     const newItem: StoreItem = {
                         ...item,
                         effectType: item.effectType || 'custom',
                         effectParams: item.effectParams || { customCode: typeof item.effect === 'string' ? item.effect : "" }
                     };
                     
-                    // Add legacy effect function for backward compatibility
                     if (typeof item.effect === 'string') {
                         newItem.effect = createEffectFunction(item.effect);
                     }
@@ -391,7 +401,6 @@ async function loadCustomItems(plugin: GamifyPlugin, items: StoreItem[]) {
     }
 }
 
-// Maintain for backward compatibility
 function createEffectFunction(effect: string): (plugin: GamifyPlugin) => void {
     return (plugin: GamifyPlugin) => {
         try {            

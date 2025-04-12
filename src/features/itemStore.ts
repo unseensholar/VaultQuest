@@ -120,7 +120,7 @@ export class ItemStoreService {
             return false;
         }
         
-        if (item.category !== 'boost' && item.category !== 'ritual') {
+        if (item.category !== 'boost' && item.category !== 'ritual' && item.category !== 'material') {
             if (this.plugin.statCardData.items.some(items => items.id === item.id)) {
                 new Notice('You already own this artifact.');
                 return false;
@@ -188,19 +188,16 @@ export class ItemStoreService {
 
 	private applyItemEffect(item: StoreItem): void {
 		try {
-			// First try the new effect system
 			if (item.effectType) {
 				this.effectService.applyEffect(item.effectType, item.effectParams || {});
 				return;
 			}
 			
-			// Fall back to legacy effect function if available
 			if (item.effect && typeof item.effect === 'function') {
 				item.effect(this.plugin);
 				return;
 			}
 			
-			// If neither is available, show a generic notice
 			new Notice(`You have acquired: ${item.name}`);
 		} catch (error) {
 			console.error("Error applying item effect:", error);
@@ -264,10 +261,8 @@ export class ItemStoreModal extends Modal {
             this.renderItems();
         });
         
-        // Divider
         const divider = filterContainer.createSpan({text: '|', cls: 'gamify-filter-divider'});
         
-        // Sort label and dropdown
         const sortLabel = filterContainer.createSpan({text: 'Sort by:', cls: 'gamify-filter-label'});
         
         const sortDropdown = new DropdownComponent(filterContainer);

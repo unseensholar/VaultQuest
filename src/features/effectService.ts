@@ -1,5 +1,6 @@
 import { Notice } from 'obsidian';
 import GamifyPlugin from '../main';
+import { StoreItem } from '../features/itemStore';
 
 export type EffectType = 
     | 'xp_boost'
@@ -10,6 +11,7 @@ export type EffectType =
     | 'unlock_title'
     | 'enable_feature'
     | 'summon_familiar'
+    | 'consumable_material'
     | 'custom';
 
 export interface EffectParams {
@@ -21,14 +23,15 @@ export interface EffectParams {
     titleDesc?: string;
     featureId?: string;
     customCode?: string;
-    // Add more parameters as needed
+	materialId?: string; 
 }
 
 export class EffectService {
     private plugin: GamifyPlugin;
-    
+    private items: StoreItem[] = [];
     constructor(plugin: GamifyPlugin) {
         this.plugin = plugin;
+		
     }
     
     applyEffect(type: EffectType, params: EffectParams = {}): void {
@@ -57,6 +60,9 @@ export class EffectService {
             case 'summon_familiar':
                 this.summonFamiliar();
                 break;
+			case 'consumable_material':
+				this.applyConsumableMaterial(params.materialId || "", params.value || 1);
+				break;				
             case 'custom':
                 if (params.customCode) {
                     this.applyCustomEffect(params.customCode);
@@ -122,7 +128,6 @@ export class EffectService {
     }
     
     private enableFeature(featureId: string): void {
-        // Enable specific features based on featureId
         switch (featureId) {
             case 'store_app':
                 new Notice('You can now access the store from the inventory!');
@@ -169,15 +174,45 @@ export class EffectService {
             this.plugin.statCardData.lastFamiliarBonusDate = today;
         }
     }
-    
+
+
+	private applyConsumableMaterial(materialId: string, quantity: number = 1): void {
+		if (!materialId) {
+			console.error("No item ID provided for consumable material effect");
+			new Notice("Error applying consumable material effect");
+			return;
+		}
+		
+		const regex = new RegExp(`^${materialId}(?:\\s+x(\\d+))?$`);
+		let existingCount = 0;
+		let existingItemName = '';
+
+		for (const item of this.plugin.statCardData.ownedItems) {
+			const match = item.match(regex);
+			if (match) {
+				existingItemName = materialId;
+				existingCount = match[1] ? parseInt(match[1]) : 1;
+				break;
+			}
+		}
+		
+		if (existingItemName) {
+			const index = this.plugin.statCardData.ownedItems.indexOf(existingItemName);
+			this.plugin.statCardData.ownedItems.splice(index, 1);
+		}
+		
+		const newCount = existingCount + quantity;
+		const newItemName = newCount > 1 ? `${materialId} x${newCount}` : materialId;
+		this.plugin.statCardData.ownedItems.push(newItemName);
+		new Notice(`You've received ${quantity} ${materialId}${quantity > 1 ? 's' : ''}! (Total: ${newCount})`);
+	}   
+	
 	private applyCustomEffect(code: string): void {
 		try {
-			// Create a safe execution context with access to Notice
 			const plugin = this.plugin;
 			const Notice = require('obsidian').Notice;
 			const app = this.plugin.app;
 			
-			// Wrapping the execution in a function with proper imports
 			const execFunction = new Function('plugin', 'Notice', 'app', `
 				try {
 					${code}
@@ -187,11 +222,9 @@ export class EffectService {
 				}
 			`);
 			
-			// Execute with proper parameters
 			execFunction(this.plugin, Notice, this.plugin.app);
 		} catch (error) {
 			console.error("Error executing custom effect:", error);
-			// Use the explicitly imported Notice here
 			const Notice = require('obsidian').Notice;
 			new Notice("Error executing custom item effect.");
 		}

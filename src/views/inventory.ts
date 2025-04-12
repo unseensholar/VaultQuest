@@ -115,31 +115,61 @@ export class InventoryTabView extends ItemView {
         this.renderInventoryGrid(items);
     }
 
-    private getInventoryItems(): InventoryItem[] {
-        if (!Array.isArray(this.plugin.statCardData.items)) {
-            return [];
-        }
+	private getInventoryItems(): InventoryItem[] {
+		if (!Array.isArray(this.plugin.statCardData.items)) {
+			return [];
+		}
 
-        return this.plugin.statCardData.items.map((item: any) => {
-            if (typeof item === "string") {
-                return { 
-                    id: item, 
-                    name: item.replace(/_/g, " "), 
-                    description: "",
-                    icon: this.getIconForItem(item)
-                };
-            } else {
-                return {
-                    id: item.id,
-                    name: item.name,
-                    description: item.description,
-                    icon: this.getIconForItem(item.id),
-                    effect: item.effect
-                };
-            }
+		return this.plugin.statCardData.items.map((item: any) => {
+			let name = item.name;
+			let description = item.description;
+			let icon = this.getIconForItem(item.id);
+			let effect: string | undefined = item.effect; // Make effect optional here too
+
+			if (typeof item === "string") {
+				name = item.replace(/_/g, " ");
+				description = "";
+				icon = this.getIconForItem(item);
+			} else {
+				const ownedItemName = this.plugin.statCardData.ownedItems.find(ownedItem => ownedItem.startsWith(item.id));
+				if (ownedItemName && ownedItemName.includes("x")) {
+					const match = ownedItemName.match(/x(\d+)$/);
+					if (match) {
+						name = `${name} x${match[1]}`;
+					}
+				}
+			}
+			return { id: item.id, name: name, description: description, icon: this.getIconForItem(item.id), effect: effect };
+		}).concat(this.getAdditionalItems().map(item => ({
+			id: item.id,
+			name: item.name,
+			description: item.description,
+			icon: item.icon,
+			effect: item.effect
+		})));
+	}
+
+    private getAdditionalItems(): InventoryItem[] {
+        const additionalItems: InventoryItem[] = [];
+        const regexList = [/experience stone/i, /ritual gem/i, /component/i, /container/i];
+
+        this.plugin.statCardData.ownedItems.forEach(ownedItem => {
+            regexList.forEach(regex => {
+                const match = ownedItem.match(regex);
+                if (match) {
+                    additionalItems.push({
+                        id: ownedItem,
+                        name: ownedItem,
+                        description: "No description",
+                        icon: "box",
+						effect: ""
+                    });
+                }
+            });
         });
+        return additionalItems;
     }
-
+	
     private renderEmptyInventory(): void {
         this.inventoryGrid.createEl("p", {
             text: "Your inventory is empty. Complete tasks to earn points and purchase items!",
