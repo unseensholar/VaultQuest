@@ -2301,48 +2301,60 @@ async function initializeStoreItems(plugin) {
       }
     },
     {
-      "id": "experience_stone",
-      "name": "Experience Stone",
-      "description": "A mystical stone required to craft XP Boost items.",
-      "cost": 100,
-      "category": "material",
-      "owned": false,
-      "levelRequired": 20,
-      "effectType": "custom",
-      "effectParams": {}
+      id: "experience_stone",
+      name: "Experience Stone",
+      description: "A mystical stone required to craft XP Boost items.",
+      cost: 100,
+      category: "material",
+      owned: false,
+      levelRequired: 20,
+      effectType: "consumable_material",
+      effectParams: {
+        materialId: "Experience Stone",
+        value: 3
+      }
     },
     {
-      "id": "ritual_gem",
-      "name": "Ritual Gem",
-      "description": "A gem imbued with ritual energy, essential for crafting Ritual items.",
-      "cost": 150,
-      "category": "material",
-      "owned": false,
-      "levelRequired": 15,
-      "effectType": "custom",
-      "effectParams": {}
+      id: "ritual_gem",
+      name: "Ritual Gem",
+      description: "A gem imbued with ritual energy, essential for crafting Ritual items.",
+      cost: 150,
+      category: "material",
+      owned: false,
+      levelRequired: 15,
+      effectType: "consumable_material",
+      effectParams: {
+        materialId: "Ritual Gem",
+        value: 3
+      }
     },
     {
-      "id": "component",
-      "name": "Component",
-      "description": "A vital component required to craft Artifact items.",
-      "cost": 200,
-      "category": "material",
-      "owned": false,
-      "levelRequired": 10,
-      "effectType": "custom",
-      "effectParams": {}
+      id: "component",
+      name: "Component",
+      description: "A vital component required to craft Artifact items.",
+      cost: 200,
+      category: "material",
+      owned: false,
+      levelRequired: 10,
+      effectType: "consumable_material",
+      effectParams: {
+        materialId: "Component",
+        value: 3
+      }
     },
     {
-      "id": "container",
-      "name": "Container",
-      "description": "A specialized container used in the crafting of Cosmetic items.",
-      "cost": 50,
-      "category": "material",
-      "owned": false,
-      "levelRequired": 0,
-      "effectType": "custom",
-      "effectParams": {}
+      id: "container",
+      name: "Container",
+      description: "A specialized container used in the crafting of Cosmetic items.",
+      cost: 50,
+      category: "material",
+      owned: false,
+      levelRequired: 0,
+      effectType: "consumable_material",
+      effectParams: {
+        materialId: "Container",
+        value: 3
+      }
     }
   ];
   await loadCustomItems(plugin, items);
@@ -2389,6 +2401,7 @@ function createEffectFunction(effect) {
 var import_obsidian7 = require("obsidian");
 var EffectService = class {
   constructor(plugin) {
+    this.items = [];
     this.plugin = plugin;
   }
   applyEffect(type, params = {}) {
@@ -2416,6 +2429,9 @@ var EffectService = class {
         break;
       case "summon_familiar":
         this.summonFamiliar();
+        break;
+      case "consumable_material":
+        this.applyConsumableMaterial(params.materialId || "", params.value || 1);
         break;
       case "custom":
         if (params.customCode) {
@@ -2512,6 +2528,32 @@ var EffectService = class {
       }
       this.plugin.statCardData.lastFamiliarBonusDate = today;
     }
+  }
+  applyConsumableMaterial(materialId, quantity = 1) {
+    if (!materialId) {
+      console.error("No item ID provided for consumable material effect");
+      new import_obsidian7.Notice("Error applying consumable material effect");
+      return;
+    }
+    const regex = new RegExp(`^${materialId}(?:\\s+x(\\d+))?$`);
+    let existingCount = 0;
+    let existingItemName = "";
+    for (const item of this.plugin.statCardData.ownedItems) {
+      const match = item.match(regex);
+      if (match) {
+        existingItemName = materialId;
+        existingCount = match[1] ? parseInt(match[1]) : 1;
+        break;
+      }
+    }
+    if (existingItemName) {
+      const index = this.plugin.statCardData.ownedItems.indexOf(existingItemName);
+      this.plugin.statCardData.ownedItems.splice(index, 1);
+    }
+    const newCount = existingCount + quantity;
+    const newItemName = newCount > 1 ? `${materialId} x${newCount}` : materialId;
+    this.plugin.statCardData.ownedItems.push(newItemName);
+    new import_obsidian7.Notice(`You've received ${quantity} ${materialId}${quantity > 1 ? "s" : ""}! (Total: ${newCount})`);
   }
   applyCustomEffect(code) {
     try {
@@ -2616,7 +2658,7 @@ var ItemStoreService = class {
       new import_obsidian8.Notice("Item not found in the catalogue.");
       return false;
     }
-    if (item.category !== "boost" && item.category !== "ritual") {
+    if (item.category !== "boost" && item.category !== "ritual" && item.category !== "material") {
       if (this.plugin.statCardData.items.some((items) => items.id === item.id)) {
         new import_obsidian8.Notice("You already own this artifact.");
         return false;
@@ -2868,8 +2910,8 @@ var ItemCrafterModal = class extends import_obsidian9.Modal {
         effectTypes: [
           { value: "unlock_title", label: "Custom Title" },
           { value: "skill_boost", label: "Skill Boost" },
-          { value: "item", label: "Item" },
-          { value: "custom", label: "Custom Effect" }
+          { value: "item", label: "Item" }
+          //{ value: 'custom', label: 'Custom Effect' }
         ],
         maxCustomLength: 500
       },
@@ -2923,19 +2965,17 @@ var ItemCrafterModal = class extends import_obsidian9.Modal {
     });
     const skillLevelInput = this.createNumberInput(skillReqContainer, "Required Skill Level:", false, 1, 20, 1);
     const costSection = contentEl.createDiv("gamify-cost-section");
-    const maxCostInput = this.createNumberInput(costSection, "Max Spending Limit (Tokens):", true, 10, 1e4, 500);
     const storageOptions = new import_obsidian9.Setting(contentEl).setName("Item Storage").setDesc("Choose how you want to save the created item");
     const saveLocationDropdown = new import_obsidian9.DropdownComponent(storageOptions.controlEl);
     saveLocationDropdown.addOptions({
-      "existing": "Add to Existing Inventory",
-      "separate": "Create Standalone Item File"
+      "existing": "Add to Existing Inventory"
+      //'separate': 'Create Standalone Item File'
     });
     const createButton = new import_obsidian9.ButtonComponent(contentEl).setButtonText("Forge Custom Item").setCta().onClick(() => this.validateAndConfirmCreation(
       nameInput.value,
       descInput.value,
       categoryDropdown.getValue(),
       effectContainer,
-      parseInt(maxCostInput.value),
       saveLocationDropdown.getValue(),
       parseInt(levelReqInput.value) || 0,
       skillDropdown.getValue() !== "none" ? { skillId: skillDropdown.getValue(), level: parseInt(skillLevelInput.value) || 1 } : void 0
@@ -3070,39 +3110,45 @@ var ItemCrafterModal = class extends import_obsidian9.Modal {
         break;
     }
   }
-  validateAndConfirmCreation(name, description, category, effectContainer, maxCost, saveLocation, levelRequired = 0, skillRequired) {
+  validateAndConfirmCreation(name, description, category, effectContainer, saveLocation, levelRequired = 0, skillRequired) {
     if (!name || !description || category === "none") {
       new import_obsidian9.Notice("Please fill in all required fields and select a category.");
       return;
     }
-    if (category === "boost") {
-      const xpInput = effectContainer.querySelector("input");
-      const xpAmount = parseInt(xpInput.value);
-      const maxAllowedXP = this.effectsConfig.boost.maxXP;
-      const hasBypass = this.plugin.statCardData.ownedItems.includes("philosopher_stone") || this.plugin.statCardData.titles.some((title) => title.id === "alchemist");
-      if (xpAmount > maxAllowedXP && !hasBypass) {
-        new import_obsidian9.Notice(`XP exceeds the maximum allowed (${maxAllowedXP}). Possess a Philosopher\u2019s Stone or have the alchemist title to bypass.`);
+    let effectType;
+    let effectParams = {};
+    try {
+      const extractedEffectData = this.extractEffects(category, effectContainer);
+      effectType = extractedEffectData.effectType;
+      effectParams = extractedEffectData.effectParams;
+      if (!this.isEffectFeasible(category, effectType, effectParams)) {
         return;
       }
+    } catch (error) {
+      new import_obsidian9.Notice(error.message);
+      return;
     }
-    const requiredItems = {
+    const requiredMaterials = {
       "boost": "Experience Stone",
       "ritual": "Ritual Gem",
       "artifact": "Component",
       "cosmetic": "Container"
     };
-    if (requiredItems[category] && !this.plugin.statCardData.ownedItems.includes(requiredItems[category])) {
-      new import_obsidian9.Notice(`Crafting a ${category} item requires a ${requiredItems[category]}.`);
-      return;
+    const requiredMaterial = requiredMaterials[category];
+    if (requiredMaterial) {
+      const hasMaterial = this.hasMaterial(requiredMaterial);
+      if (!hasMaterial) {
+        new import_obsidian9.Notice(`Crafting a ${category} item requires a ${requiredMaterial.replace("_", " ")}.`);
+        return;
+      }
     }
-    const finalCost = this.calculateCost(category, effectContainer, maxCost);
+    const finalCost = this.calculateCost(category, effectContainer, effectType, effectParams);
     const creationCost = Math.round(finalCost * 1.6);
     const hasCostBypass = this.plugin.statCardData.ownedItems.includes("alkhest") || this.plugin.statCardData.titles.some((title) => title.id === "Creator");
-    if (maxCost < finalCost && !hasCostBypass) {
-      new import_obsidian9.Notice("Insufficient limit. Offer an equivalent price.");
+    if (this.plugin.statCardData.points < creationCost && !hasCostBypass) {
+      new import_obsidian9.Notice("Insufficient tokens for item creation.");
       return;
     }
-    const { effectType, effectParams } = this.extractEffects(category, effectContainer);
     this.showConfirmationModal(
       name,
       description,
@@ -3115,6 +3161,70 @@ var ItemCrafterModal = class extends import_obsidian9.Modal {
       levelRequired,
       skillRequired
     );
+  }
+  hasMaterial(materialId) {
+    const regex = new RegExp(`^${materialId}(?:\\s+x(\\d+))?$`);
+    for (const item of this.plugin.statCardData.ownedItems) {
+      const match = item.match(regex);
+      if (match) {
+        return true;
+      }
+    }
+    return false;
+  }
+  consumeMaterial(materialId) {
+    const regex = new RegExp(`^${materialId}(?:\\s+x(\\d+))?$`);
+    let existingItem = "";
+    let existingCount = 0;
+    for (const item of this.plugin.statCardData.ownedItems) {
+      const match = item.match(regex);
+      if (match) {
+        existingItem = item;
+        existingCount = match[1] ? parseInt(match[1]) : 1;
+        break;
+      }
+    }
+    if (!existingItem) {
+      return false;
+    }
+    const index = this.plugin.statCardData.ownedItems.indexOf(existingItem);
+    this.plugin.statCardData.ownedItems.splice(index, 1);
+    if (existingCount > 1) {
+      const newCount = existingCount - 1;
+      const newItemName = newCount > 1 ? `${materialId} x${newCount}` : materialId;
+      this.plugin.statCardData.ownedItems.push(newItemName);
+    }
+    return true;
+  }
+  createItem(name, description, category, cost, creationCost, effectType, effectParams, saveLocation, levelRequired = 0, skillRequired) {
+    const requiredMaterials = {
+      "boost": "Experience Stone",
+      "ritual": "Ritual Gem",
+      "artifact": "Component",
+      "cosmetic": "Container"
+    };
+    const requiredMaterial = requiredMaterials[category];
+    if (requiredMaterial) {
+      const consumed = this.consumeMaterial(requiredMaterial);
+      if (!consumed) {
+        new import_obsidian9.Notice(`Failed to consume ${requiredMaterial.replace("_", " ")}. Crafting canceled.`);
+        return;
+      }
+    }
+    const newItem = {
+      id: `custom_${category}_${Date.now()}`,
+      name,
+      description,
+      cost,
+      category,
+      owned: false,
+      levelRequired: levelRequired > 0 ? levelRequired : void 0,
+      skillRequired,
+      effectType,
+      effectParams,
+      hidden: false
+    };
+    saveLocation === "existing" ? this.saveItemToInventory(newItem) : this.saveItemToSeparateFile(newItem);
   }
   showConfirmationModal(name, description, category, finalCost, creationCost, effectType, effectParams, saveLocation, levelRequired = 0, skillRequired) {
     const confirmModal = new import_obsidian9.Modal(this.app);
@@ -3237,29 +3347,63 @@ var ItemCrafterModal = class extends import_obsidian9.Modal {
     }
     return { effectType, effectParams };
   }
-  calculateCost(category, container, maxCost) {
+  isEffectFeasible(category, effectType, effectParams) {
+    switch (category) {
+      case "boost":
+        if (effectType === "xp_boost") {
+          const xpAmount = effectParams.value;
+          const maxAllowedXP = this.effectsConfig.boost.maxXP;
+          const hasBypass = this.plugin.statCardData.ownedItems.includes("philosopher_stone") || this.plugin.statCardData.titles.some((title) => title.id === "alchemist");
+          if (xpAmount > maxAllowedXP && !hasBypass) {
+            new import_obsidian9.Notice(`XP exceeds the maximum allowed (${maxAllowedXP}). Possess a Philosopher's Stone or have the alchemist title to bypass.`);
+            return false;
+          }
+        }
+        break;
+      case "ritual":
+        if (effectType === "xp_multiplier" || effectType === "store_discount" || effectType === "points_boost") {
+          const multiplier = effectParams.value;
+          const duration = effectParams.duration;
+          if (multiplier > this.effectsConfig.ritual.maxMultiplier) {
+            new import_obsidian9.Notice(`Multiplier exceeds the maximum allowed (${this.effectsConfig.ritual.maxMultiplier}).`);
+            return false;
+          }
+          if (duration > this.effectsConfig.ritual.maxDuration) {
+            new import_obsidian9.Notice(`Duration exceeds the maximum allowed (${this.effectsConfig.ritual.maxDuration} hours).`);
+            return false;
+          }
+        }
+        break;
+    }
+    return true;
+  }
+  calculateCost(category, container, effectType, effectParams) {
     let baseCost = this.baseCost;
     let effectMultiplier = 1;
     switch (category) {
       case "boost":
-        const xpInput = container.querySelector("input");
-        const xpAmount = parseInt(xpInput.value);
-        baseCost = xpAmount / this.effectsConfig.boost.conversionRate;
-        this.effectsConfig.boost.discountThresholds.forEach((threshold) => {
-          if (xpAmount >= threshold.threshold) {
-            baseCost *= threshold.multiplier;
-          }
-        });
-        effectMultiplier = 1 + xpAmount / this.effectsConfig.boost.maxXP;
+        if (effectType === "xp_boost") {
+          const xpInput = container.querySelector("input");
+          const xpAmount = parseInt(xpInput.value);
+          baseCost = xpAmount / this.effectsConfig.boost.conversionRate;
+          this.effectsConfig.boost.discountThresholds.forEach((threshold) => {
+            if (xpAmount >= threshold.threshold) {
+              baseCost *= threshold.multiplier;
+            }
+          });
+          effectMultiplier = 1 + xpAmount / this.effectsConfig.boost.maxXP;
+        }
         break;
       case "ritual":
-        const valueInput = container.querySelectorAll("input")[0];
-        const durationInput = container.querySelectorAll("input")[1];
-        baseCost = 200 + parseFloat(valueInput.value) * this.effectsConfig.ritual.costScaleFactor + parseInt(durationInput.value) / 10 * 50;
-        effectMultiplier = parseFloat(valueInput.value);
+        if (effectType === "xp_multiplier" || effectType === "store_discount" || effectType === "points_boost") {
+          const valueInput = container.querySelectorAll("input")[0];
+          const durationInput = container.querySelectorAll("input")[1];
+          baseCost = 200 + parseFloat(valueInput.value) * this.effectsConfig.ritual.costScaleFactor + parseInt(durationInput.value) / 10 * 50;
+          effectMultiplier = parseFloat(valueInput.value);
+        }
         break;
       case "artifact":
-        baseCost = 500 + maxCost / 2;
+        baseCost = 500;
         effectMultiplier = 1.2;
         break;
       case "cosmetic":
@@ -3267,23 +3411,8 @@ var ItemCrafterModal = class extends import_obsidian9.Modal {
         effectMultiplier = 1.1;
         break;
     }
-    return Math.min(Math.round(baseCost * effectMultiplier), maxCost);
-  }
-  createItem(name, description, category, cost, creationCost, effectType, effectParams, saveLocation, levelRequired = 0, skillRequired) {
-    const newItem = {
-      id: `custom_${category}_${Date.now()}`,
-      name,
-      description,
-      cost,
-      category,
-      owned: false,
-      levelRequired: levelRequired > 0 ? levelRequired : void 0,
-      skillRequired,
-      effectType,
-      effectParams,
-      hidden: false
-    };
-    saveLocation === "existing" ? this.saveItemToInventory(newItem) : this.saveItemToSeparateFile(newItem);
+    let finalCost = Math.round(baseCost * effectMultiplier);
+    return Math.round(finalCost);
   }
   saveItemToInventory(item) {
     try {
@@ -3567,23 +3696,50 @@ var InventoryTabView = class extends import_obsidian11.ItemView {
       return [];
     }
     return this.plugin.statCardData.items.map((item) => {
+      let name = item.name;
+      let description = item.description;
+      let icon = this.getIconForItem(item.id);
+      let effect = item.effect;
       if (typeof item === "string") {
-        return {
-          id: item,
-          name: item.replace(/_/g, " "),
-          description: "",
-          icon: this.getIconForItem(item)
-        };
+        name = item.replace(/_/g, " ");
+        description = "";
+        icon = this.getIconForItem(item);
       } else {
-        return {
-          id: item.id,
-          name: item.name,
-          description: item.description,
-          icon: this.getIconForItem(item.id),
-          effect: item.effect
-        };
+        const ownedItemName = this.plugin.statCardData.ownedItems.find((ownedItem) => ownedItem.startsWith(item.id));
+        if (ownedItemName && ownedItemName.includes("x")) {
+          const match = ownedItemName.match(/x(\d+)$/);
+          if (match) {
+            name = `${name} x${match[1]}`;
+          }
+        }
       }
+      return { id: item.id, name, description, icon: this.getIconForItem(item.id), effect };
+    }).concat(this.getAdditionalItems().map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      icon: item.icon,
+      effect: item.effect
+    })));
+  }
+  getAdditionalItems() {
+    const additionalItems = [];
+    const regexList = [/experience stone/i, /ritual gem/i, /component/i, /container/i];
+    this.plugin.statCardData.ownedItems.forEach((ownedItem) => {
+      regexList.forEach((regex) => {
+        const match = ownedItem.match(regex);
+        if (match) {
+          additionalItems.push({
+            id: ownedItem,
+            name: ownedItem,
+            description: "No description",
+            icon: "box",
+            effect: ""
+          });
+        }
+      });
     });
+    return additionalItems;
   }
   renderEmptyInventory() {
     this.inventoryGrid.createEl("p", {
