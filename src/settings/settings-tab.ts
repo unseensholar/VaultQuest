@@ -4,13 +4,13 @@ import { DebugMenu } from '../debug/DebugMenu';
 import { AchievementsService } from '../features/achievements';
 import { NotificationListener, addNotificationSettingsUI } from '../support/notificationListener';
 
-const difficultyLevels = {
-    "Very Easy": 0,
-    "Easy": 0.001,
-    "Normal": 0.01,
-    "Hard": 0.025,
-    "Very Hard": 0.05,
-    "Brutal": 0.1,
+const difficultyLevels: { [key in "Very Easy" | "Easy" | "Normal" | "Hard" | "Very Hard" | "Brutal"]: number } = {
+  "Very Easy": 0,
+  Easy: 0.001,
+  Normal: 0.01,
+  Hard: 0.025,
+  "Very Hard": 0.05,
+  Brutal: 0.1,
 };
 
 export class GamifySettingTab extends PluginSettingTab {
