@@ -5,12 +5,12 @@ import { AchievementsService } from '../features/achievements';
 import { NotificationListener, addNotificationSettingsUI } from '../support/notificationListener';
 
 const difficultyLevels: { [key: string]: number } = {
-    "Very Easy": 1,
-    Easy: 2,
-    Normal: 3,
-    Hard: 4,
-    "Very Hard": 5,
-    Brutal: 6,
+    "Very Easy": 0,
+    Easy: 0.001,
+    Normal: 0.01,
+    Hard: 0.025,
+    "Very Hard": 0.05,
+    Brutal: 0.1,
 };
 
 export class GamifySettingTab extends PluginSettingTab {
