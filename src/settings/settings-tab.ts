@@ -90,6 +90,13 @@ export class GamifySettingTab extends PluginSettingTab {
 	                dropdown.onChange(async (value) => {
 	                    this.plugin.settings.levelling_difficulty = difficultyLevels[value];
 	                    await this.plugin.saveSettings();
+						let baseXp = 100;
+						let NextuserLvl = this.plugin.statCardData.level+1;
+						for (let i = 1; i < NextuserLvl; i++) {
+							baseXp *= (1.1 + i * this.plugin.settings.levelling_difficulty);
+						}					
+						this.plugin.statCardData.nextLevelXp = Math.round(baseXp)
+						await this.plugin.saveStatCardData()
 	                });
 	            });
 			    
