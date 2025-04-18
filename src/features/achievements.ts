@@ -219,7 +219,11 @@ export class AchievementsService {
 	async loadCustomAchievements(): Promise<void> {
 		this.customAchievements = [];
 		const folderPath = "QuestLog/Achievements";
-		
+		const Achievementsfolder = this.plugin.app.vault.getAbstractFileByPath(folderPath);
+		if (!Achievementsfolder) {
+			await this.plugin.app.vault.createFolder(folderPath);
+			console.log(`Created plugin data folder: ${folderPath}`);
+		}		
 		try {
 			const files = this.plugin.app.vault.getFiles().filter(file => 
 				file.path.startsWith(folderPath) && file.extension === "json"
