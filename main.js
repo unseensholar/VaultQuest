@@ -872,6 +872,7 @@ var StatCardModal = class _StatCardModal extends import_obsidian2.Modal {
 var LLMTaskService = class {
   constructor(plugin) {
     this.keyPressCount = 0;
+    this.totalCharactersTyped = 0;
     this.intervalId = null;
     this.plugin = plugin;
     this.keyboardListener = this.handleKeyPress.bind(this);
@@ -882,13 +883,9 @@ var LLMTaskService = class {
   handleKeyPress(e) {
     if (e.key.length === 1 || e.key === "Backspace" || e.key === "Delete" || e.key === "Enter") {
       this.keyPressCount++;
+      this.totalCharactersTyped = this.plugin.statCardData.writingStats.totalCharactersTyped;
       if (this.keyPressCount >= 50) {
-        try {
-          this.updateWritingSkill(this.keyPressCount);
-          this.keyPressCount = 0;
-        } catch (error) {
-          console.error("Error updating writing skill:", error);
-        }
+        this.updateWritingSkill(this.totalCharactersTyped);
       }
     }
   }
@@ -920,11 +917,11 @@ var LLMTaskService = class {
       console.error("Error updating file/folder counts:", error);
     }
   }
-  updateWritingSkill(keyCount) {
+  updateWritingSkill(totalCharactersTyped) {
     const skill = this.plugin.statCardData.skills.find((s) => s.id === "writing");
     if (skill) {
-      const xpGain = Math.floor(keyCount / 1);
-      this.updateSkill(skill, xpGain);
+      const result = this.getLevelForCount(totalCharactersTyped, 50, 25);
+      this.setSkillLevel(skill, result.level, result.progress);
     }
   }
   getRequiredCountForLevel(level, baseCount, incrementFactor) {
@@ -975,27 +972,9 @@ var LLMTaskService = class {
     if (newLevel > oldLevel) {
       const pointsGained = (newLevel - oldLevel) * 2;
       this.plugin.statCardData.points += pointsGained;
-      new import_obsidian3.Notice(`Your ${skill.name} skill has increased to level ${skill.level}!`);
-    }
-  }
-  updateSkill(skill, xpAmount) {
-    var _a;
-    if (xpAmount <= 0) return;
-    if ((_a = this.plugin.statCardData.activeEffects) == null ? void 0 : _a.xpMultiplier) {
-      const multiplier = this.plugin.statCardData.activeEffects.xpMultiplier;
-      const now = Date.now();
-      if (multiplier.expiresAt > now) {
-        xpAmount = Math.floor(xpAmount * multiplier.value);
-      }
-    }
-    skill.xp += xpAmount;
-    const nextLevel = skill.level + 1;
-    const xpForNextLevel = Math.floor(100 + 25 * nextLevel + Math.pow(nextLevel, 2) * 2);
-    if (skill.xp >= xpForNextLevel) {
-      skill.level = nextLevel;
-      skill.xp = 0;
-      new import_obsidian3.Notice(`Your ${skill.name} skill has increased to level ${skill.level}!`);
-      this.plugin.statCardData.points += nextLevel * 2;
+      setTimeout(() => {
+        new import_obsidian3.Notice(`Your ${skill.name} skill has increased to level ${skill.level}!`);
+      }, 1e4);
     }
   }
   async executeTask(instruction) {
@@ -4249,12 +4228,12 @@ function addNotificationSettingsUI(containerEl, plugin, notificationListener, se
 
 // settings/settings-tab.ts
 var difficultyLevels = {
-  "Very Easy": 1,
-  Easy: 2,
-  Normal: 3,
-  Hard: 4,
-  "Very Hard": 5,
-  Brutal: 6
+  "Very Easy": 0,
+  Easy: 1e-3,
+  Normal: 0.01,
+  Hard: 0.025,
+  "Very Hard": 0.05,
+  Brutal: 0.1
 };
 var GamifySettingTab = class extends import_obsidian14.PluginSettingTab {
   constructor(app, plugin) {
@@ -5816,7 +5795,7 @@ var GamifyPlugin = class extends import_obsidian17.Plugin {
     }
     this.typing.timeout = setTimeout(() => {
       this.processTypingXp();
-    }, 2e3);
+    }, 200);
   }
   processTypingXp() {
     const xpGained = this.typing.characterCount * this.settings.xpPerCharacter;
@@ -6012,9 +5991,7 @@ var GamifyPlugin = class extends import_obsidian17.Plugin {
     while (this.statCardData.xp >= this.statCardData.nextLevelXp) {
       this.statCardData.xp -= this.statCardData.nextLevelXp;
       this.statCardData.level++;
-      this.statCardData.nextLevelXp = Math.round(
-        this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * this.settings.levelling_difficulty)
-      );
+      this.statCardData.nextLevelXp = Math.round(this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * this.settings.levelling_difficulty));
       new import_obsidian17.Notice(`Congratulations! You reached level ${this.statCardData.level}!`);
       const levelUpReward = Math.round(10 + this.statCardData.level * 2 + this.statCardData.level ** 1.5);
       this.statCardData.points += levelUpReward;
