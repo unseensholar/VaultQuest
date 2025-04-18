@@ -401,7 +401,7 @@ export default class GamifyPlugin extends Plugin {
 		
 		this.typing.timeout = setTimeout(() => {
 			this.processTypingXp();
-		}, 2000);
+		}, 200);
 	}
 
 	processTypingXp() {
@@ -635,9 +635,7 @@ export default class GamifyPlugin extends Plugin {
 			this.statCardData.level++;
 			
 			// Increase required XP for next level
-			this.statCardData.nextLevelXp = Math.round(
-    this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * this.settings.levelling_difficulty)
-);
+			this.statCardData.nextLevelXp = Math.round(this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * this.settings.levelling_difficulty));
 			new Notice(`Congratulations! You reached level ${this.statCardData.level}!`);
 			const levelUpReward = Math.round(10 + (this.statCardData.level * 2) + (this.statCardData.level ** 1.5));
 			this.statCardData.points += levelUpReward;
