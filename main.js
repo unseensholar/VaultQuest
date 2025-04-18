@@ -4248,6 +4248,14 @@ function addNotificationSettingsUI(containerEl, plugin, notificationListener, se
 }
 
 // settings/settings-tab.ts
+var difficultyLevels = {
+  "Very Easy": 1,
+  Easy: 2,
+  Normal: 3,
+  Hard: 4,
+  "Very Hard": 5,
+  Brutal: 6
+};
 var GamifySettingTab = class extends import_obsidian14.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
@@ -4292,6 +4300,27 @@ var GamifySettingTab = class extends import_obsidian14.PluginSettingTab {
         text: "You do not have permission to modify this settings."
       });
     }
+    new import_obsidian14.Setting(containerEl).setName("Leveling Difficulty").setDesc("Adjust the XP scaling difficulty for leveling.").addDropdown((dropdown) => {
+      Object.keys(difficultyLevels).forEach((level) => {
+        dropdown.addOption(level, level);
+      });
+      dropdown.setValue(
+        Object.keys(difficultyLevels).find(
+          (key) => difficultyLevels[key] === this.plugin.settings.levelling_difficulty
+        ) || "Hard"
+      );
+      dropdown.onChange(async (value) => {
+        this.plugin.settings.levelling_difficulty = difficultyLevels[value];
+        await this.plugin.saveSettings();
+        let baseXp = 100;
+        let NextuserLvl = this.plugin.statCardData.level + 1;
+        for (let i = 1; i < NextuserLvl; i++) {
+          baseXp *= 1.1 + i * this.plugin.settings.levelling_difficulty;
+        }
+        this.plugin.statCardData.nextLevelXp = Math.round(baseXp);
+        await this.plugin.saveStatCardData();
+      });
+    });
     new import_obsidian14.Setting(containerEl).setName("XP per character").setDesc("How much XP is earned for each character typed.").addText((text) => {
       text.setValue(this.plugin.settings.xpPerCharacter.toString());
       if (!this.hasSystemControlAccess()) {
@@ -4860,6 +4889,11 @@ var AchievementsService = class {
   async loadCustomAchievements() {
     this.customAchievements = [];
     const folderPath = "QuestLog/Achievements";
+    const Achievementsfolder = this.plugin.app.vault.getAbstractFileByPath(folderPath);
+    if (!Achievementsfolder) {
+      await this.plugin.app.vault.createFolder(folderPath);
+      console.log(`Created plugin data folder: ${folderPath}`);
+    }
     try {
       const files = this.plugin.app.vault.getFiles().filter(
         (file) => file.path.startsWith(folderPath) && file.extension === "json"
@@ -4889,10 +4923,367 @@ var AchievementsService = class {
     const defaultAchievements = JSON.stringify([
       {
         "id": "Hello World",
-        "name": "Hello World",
-        "description": "Write something",
+        "name": "Hello World!",
+        "description": "Write something for beginner's bonus.",
         "condition": { "type": "writing", "value": 1 },
         "reward": { "type": "points", "value": 100 }
+      },
+      {
+        "id": "first_steps",
+        "name": "First Steps",
+        "description": "Complete your first task.",
+        "condition": { "type": "tasks_completed", "value": 1 },
+        "reward": { "type": "xp", "value": 10 }
+      },
+      {
+        "id": "task_initiate",
+        "name": "Task Initiate",
+        "description": "Complete 10 tasks.",
+        "condition": { "type": "tasks_completed", "value": 10 },
+        "reward": { "type": "xp", "value": 50 }
+      },
+      {
+        "id": "task_master",
+        "name": "Task Master",
+        "description": "Complete 100 tasks.",
+        "condition": { "type": "tasks_completed", "value": 100 },
+        "reward": { "type": "xp", "value": 250 }
+      },
+      {
+        "id": "task_master_discount",
+        "name": "Task Master's Right",
+        "description": "Complete 100 tasks.",
+        "condition": { "type": "tasks_completed", "value": 100 },
+        "reward": { "type": "perm_discount", "value": 0.2 }
+      },
+      {
+        "id": "relentless_worker",
+        "name": "Relentless Worker",
+        "description": "Complete 500 tasks.",
+        "condition": { "type": "tasks_completed", "value": 500 },
+        "reward": { "type": "title", "value": "Relentless" }
+      },
+      {
+        "id": "keepatit",
+        "name": "Keep At It",
+        "description": "Complete 1,000 tasks.",
+        "condition": { "type": "tasks_completed", "value": 1e3 },
+        "reward": { "type": "special_item", "value": "Golden Notebook" }
+      },
+      {
+        "id": "daily_streak_3",
+        "name": "Getting Started",
+        "description": "Complete tasks for 3 days in a row.",
+        "condition": { "type": "streak", "value": 3 },
+        "reward": { "type": "xp", "value": 50 }
+      },
+      {
+        "id": "daily_streak_5",
+        "name": "Good Rhythm",
+        "description": "Complete tasks for 5 days in a row.",
+        "condition": { "type": "streak", "value": 5 },
+        "reward": { "type": "temp_xp_multiplier", "value": 2 }
+      },
+      {
+        "id": "daily_streak_7",
+        "name": "Consistency King",
+        "description": "Complete tasks for 7 days in a row.",
+        "condition": { "type": "streak", "value": 7 },
+        "reward": { "type": "xp", "value": 250 }
+      },
+      {
+        "id": "daily_streak_10",
+        "name": "Hyper Fixated",
+        "description": "Complete tasks for 10 days in a row.",
+        "condition": { "type": "streak", "value": 10 },
+        "reward": { "type": "temp_xp_multiplier", "value": 5 }
+      },
+      {
+        "id": "daily_streak_30",
+        "name": "One-Month Marathon",
+        "description": "Complete tasks for 30 days straight.",
+        "condition": { "type": "streak", "value": 30 },
+        "reward": { "type": "title", "value": "The Unstoppable" }
+      },
+      {
+        "id": "daily_streak_30_buff",
+        "name": "Persistent",
+        "description": "Complete tasks for 30 days straight.",
+        "condition": { "type": "streak", "value": 30 },
+        "reward": { "type": "perm_xp_multiplier", "value": "100" }
+      },
+      {
+        "id": "discipline_master",
+        "name": "Discipline Master",
+        "description": "Maintain a 100-day task streak.",
+        "condition": { "type": "streak", "value": 100 },
+        "reward": { "type": "special_item", "value": "Chrono Badge" }
+      },
+      {
+        "id": "longest_streak",
+        "name": "Discipline Master",
+        "description": "Achieve a 100-day streak.",
+        "condition": { "type": "streak", "value": 100 },
+        "reward": { "type": "title", "value": "True Legend" }
+      },
+      {
+        "id": "note_taker",
+        "name": "Note Taker",
+        "description": "Write 1,000 characters in your notes.",
+        "condition": { "type": "writing", "value": 1e3 },
+        "reward": { "type": "xp", "value": 20 }
+      },
+      {
+        "id": "word_smith",
+        "name": "Wordsmith",
+        "description": "Write 10,000 characters.",
+        "condition": { "type": "writing", "value": 1e4 },
+        "reward": { "type": "xp", "value": 100 }
+      },
+      {
+        "id": "scribe_master",
+        "name": "Scribe Master",
+        "description": "Write 50,000 characters.",
+        "condition": { "type": "writing", "value": 5e4 },
+        "reward": { "type": "title", "value": "Master Scribe" }
+      },
+      {
+        "id": "literary_titan",
+        "name": "Literary Titan",
+        "description": "Write 100,000 characters.",
+        "condition": { "type": "writing", "value": 1e5 },
+        "reward": { "type": "xp", "value": 300 }
+      },
+      {
+        "id": "notes_hoarder",
+        "name": "Archivist",
+        "description": "Write 100 notes.",
+        "condition": { "type": "notes_created", "value": 100 },
+        "reward": { "type": "xp", "value": 150 }
+      },
+      {
+        "id": "loyal_user",
+        "name": "Loyal User",
+        "description": "Use the plugin for 100 days.",
+        "condition": { "type": "plugin_usage", "value": 100 },
+        "reward": { "type": "special_item", "value": "Token of Thanks" }
+      },
+      {
+        "id": "loyal_user_discount",
+        "name": "Loyal User's Reward",
+        "description": "Use the plugin for 100 days.",
+        "condition": { "type": "plugin_usage", "value": 100 },
+        "reward": { "type": "perm_discount", "value": 0.2 }
+      },
+      {
+        "id": "level_2",
+        "name": "Rookie",
+        "description": "Reach Level 2.",
+        "condition": { "type": "level", "value": 2 },
+        "reward": { "type": "xp", "value": 20 }
+      },
+      {
+        "id": "level_5",
+        "name": "Getting Serious",
+        "description": "Reach Level 5.",
+        "condition": { "type": "level", "value": 5 },
+        "reward": { "type": "temp_xp_multiplier", "value": 1.5 }
+      },
+      {
+        "id": "level_10",
+        "name": "Level Climber",
+        "description": "Reach Level 10.",
+        "condition": { "type": "level", "value": 10 },
+        "reward": { "type": "temp_discount", "value": 0.05 }
+      },
+      {
+        "id": "level_20",
+        "name": "Dedicated",
+        "description": "Reach Level 20.",
+        "condition": { "type": "level", "value": 20 },
+        "reward": { "type": "temp_xp_multiplier", "value": 2 }
+      },
+      {
+        "id": "level_25",
+        "name": "Veteran",
+        "description": "Reach Level 25.",
+        "condition": { "type": "level", "value": 25 },
+        "reward": { "type": "xp", "value": 500 }
+      },
+      {
+        "id": "level_30",
+        "name": "Resilient",
+        "description": "Reach Level 30.",
+        "condition": { "type": "level", "value": 30 },
+        "reward": { "type": "temp_discount", "value": 0.1 }
+      },
+      {
+        "id": "level_40",
+        "name": "Experienced",
+        "description": "Reach Level 40.",
+        "condition": { "type": "level", "value": 40 },
+        "reward": { "type": "temp_xp_multiplier", "value": 3 }
+      },
+      {
+        "id": "level_50",
+        "name": "RPG Legend",
+        "description": "Reach Level 50.",
+        "condition": { "type": "level", "value": 50 },
+        "reward": { "type": "temp_xp_multiplier", "value": 5 }
+      },
+      {
+        "id": "level_50",
+        "name": "RPG Legend",
+        "description": "Reach Level 50.",
+        "condition": { "type": "level", "value": 50 },
+        "reward": { "type": "title", "value": "Legendary Hero" }
+      },
+      {
+        "id": "level_60",
+        "name": "Battle-Hardened",
+        "description": "Reach Level 60.",
+        "condition": { "type": "level", "value": 60 },
+        "reward": { "type": "temp_discount", "value": 0.15 }
+      },
+      {
+        "id": "level_70",
+        "name": "Master Adventurer",
+        "description": "Reach Level 70.",
+        "condition": { "type": "level", "value": 70 },
+        "reward": { "type": "temp_xp_multiplier", "value": 4 }
+      },
+      {
+        "id": "level_80",
+        "name": "Grandmaster",
+        "description": "Reach Level 80.",
+        "condition": { "type": "level", "value": 80 },
+        "reward": { "type": "temp_discount", "value": 0.2 }
+      },
+      {
+        "id": "level_90",
+        "name": "Elite",
+        "description": "Reach Level 90.",
+        "condition": { "type": "level", "value": 90 },
+        "reward": { "type": "temp_xp_multiplier", "value": 5 }
+      },
+      {
+        "id": "level_100",
+        "name": "Centurion",
+        "description": "Reach Level 100.",
+        "condition": { "type": "level", "value": 100 },
+        "reward": { "type": "title", "value": "The Unyielding" }
+      },
+      {
+        "id": "level_100_Reward",
+        "name": "Centurion's Bounty",
+        "description": "Reach Level 100.",
+        "condition": { "type": "level", "value": 100 },
+        "reward": { "type": "points", "value": 1e4 }
+      },
+      {
+        "id": "level_500",
+        "name": "The Eternal",
+        "description": "Reach Level 500.",
+        "condition": { "type": "level", "value": 500 },
+        "reward": { "type": "perm_discount", "value": 0.25 }
+      },
+      {
+        "id": "level_500",
+        "name": "The Gift of Eternity",
+        "description": "Reach Level 500.",
+        "condition": { "type": "level", "value": 500 },
+        "reward": { "type": "points", "value": 1e5 }
+      },
+      {
+        "id": "level_1000",
+        "name": "Immortal Legend",
+        "description": "Reach Level 1000.",
+        "condition": { "type": "level", "value": 1e3 },
+        "reward": { "type": "perm_discount", "value": 0.5 }
+      },
+      {
+        "id": "level_1000",
+        "name": "The Reward for Persistance",
+        "description": "Reach Level 1000.",
+        "condition": { "type": "level", "value": 1e3 },
+        "reward": { "type": "points", "value": 1e7 }
+      },
+      {
+        "id": "point_collector_1",
+        "name": "Novice Worker",
+        "description": "Earn 1,000 points",
+        "condition": { "type": "point_collected", "value": 1e3 },
+        "reward": { "type": "xp", "value": 100 }
+      },
+      {
+        "id": "point_collector_2",
+        "name": "Diligent Earner",
+        "description": "Earn 5,000 points",
+        "condition": { "type": "point_collected", "value": 5e3 },
+        "reward": { "type": "xp", "value": 250 }
+      },
+      {
+        "id": "point_collector_3",
+        "name": "Wealthy",
+        "description": "Earn 10,000 points",
+        "condition": { "type": "point_collected", "value": 1e4 },
+        "reward": { "type": "title", "value": "Wealthy" }
+      },
+      {
+        "id": "point_collector_4",
+        "name": "Treasure Hunter",
+        "description": "Earn 25,000 points",
+        "condition": { "type": "point_collected", "value": 25e3 },
+        "reward": { "type": "perm_discount", "value": 0.05 }
+      },
+      {
+        "id": "point_collector_5",
+        "name": "Master of Fortune",
+        "description": "Earn 50,000 points",
+        "condition": { "type": "point_collected", "value": 5e4 },
+        "reward": { "type": "perm_xp_multiplier", "value": 1.1 }
+      },
+      {
+        "id": "point_collector_6",
+        "name": "King of Gold",
+        "description": "Earn 100,000 points",
+        "condition": { "type": "point_collected", "value": 1e5 },
+        "reward": { "type": "item", "value": "Token of Immense Wealth" }
+      },
+      {
+        "id": "point_collector_7",
+        "name": "Millionaire",
+        "description": "Earn 1,000,000 points",
+        "condition": { "type": "point_collected", "value": 1e6 },
+        "reward": { "type": "title", "value": "The Untouchable" }
+      },
+      {
+        "id": "first_purchase",
+        "name": "First Investment",
+        "description": "Buy your first item from the store",
+        "condition": { "type": "items_purchased", "value": 1 },
+        "reward": { "type": "xp", "value": 50 }
+      },
+      {
+        "id": "shopaholic",
+        "name": "Shopaholic",
+        "description": "Buy 10 items from the store",
+        "condition": { "type": "items_purchased", "value": 10 },
+        "reward": { "type": "xp", "value": 100 }
+      },
+      {
+        "id": "retail_therapy",
+        "name": "Retail Therapy",
+        "description": "Buy 50 items from the store",
+        "condition": { "type": "items_purchased", "value": 50 },
+        "reward": { "type": "title", "value": "Big Spender" }
+      },
+      {
+        "id": "ultimate_consumer",
+        "name": "Ultimate Consumer",
+        "description": "Buy a total of 100,000 items from the store",
+        "condition": { "type": "items_purchased", "value": 1e5 },
+        "reward": { "type": "title", "value": "The Mogul" }
       }
     ], null, 2);
     try {
@@ -5123,6 +5514,7 @@ var RibbonManager = class {
 var DEFAULT_SETTINGS = {
   xpPerCharacter: 0.1,
   pointsBaseValue: 10,
+  levelling_difficulty: 0.01,
   tagMultipliers: {
     "#easy": 0.5,
     "#medium": 1,
@@ -5620,7 +6012,9 @@ var GamifyPlugin = class extends import_obsidian17.Plugin {
     while (this.statCardData.xp >= this.statCardData.nextLevelXp) {
       this.statCardData.xp -= this.statCardData.nextLevelXp;
       this.statCardData.level++;
-      this.statCardData.nextLevelXp = Math.round(this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * 0.05));
+      this.statCardData.nextLevelXp = Math.round(
+        this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * this.settings.levelling_difficulty)
+      );
       new import_obsidian17.Notice(`Congratulations! You reached level ${this.statCardData.level}!`);
       const levelUpReward = Math.round(10 + this.statCardData.level * 2 + this.statCardData.level ** 1.5);
       this.statCardData.points += levelUpReward;

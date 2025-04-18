@@ -4,6 +4,14 @@ import { DebugMenu } from '../debug/DebugMenu';
 import { AchievementsService } from '../features/achievements';
 import { NotificationListener, addNotificationSettingsUI } from '../support/notificationListener';
 
+const difficultyLevels: { [key: string]: number } = {
+    "Very Easy": 1,
+    Easy: 2,
+    Normal: 3,
+    Hard: 4,
+    "Very Hard": 5,
+    Brutal: 6,
+};
 
 export class GamifySettingTab extends PluginSettingTab {
 	plugin: GamifyPlugin;
@@ -64,6 +72,34 @@ export class GamifySettingTab extends PluginSettingTab {
                 text: 'You do not have permission to modify this settings.'
             });
         }		
+		new Setting(containerEl)
+	            .setName("Leveling Difficulty")
+	            .setDesc("Adjust the XP scaling difficulty for leveling.")
+	            .addDropdown((dropdown) => {
+	                Object.keys(difficultyLevels).forEach((level) => {
+	                    dropdown.addOption(level, level);
+	                });
+	
+	                dropdown.setValue(
+	                    Object.keys(difficultyLevels).find(
+	                        (key) =>
+	                            difficultyLevels[key] === this.plugin.settings.levelling_difficulty
+	                    ) || "Hard"
+	                );
+	
+	                dropdown.onChange(async (value) => {
+	                    this.plugin.settings.levelling_difficulty = difficultyLevels[value];
+	                    await this.plugin.saveSettings();
+						let baseXp = 100;
+						let NextuserLvl = this.plugin.statCardData.level+1;
+						for (let i = 1; i < NextuserLvl; i++) {
+							baseXp *= (1.1 + i * this.plugin.settings.levelling_difficulty);
+						}					
+						this.plugin.statCardData.nextLevelXp = Math.round(baseXp)
+						await this.plugin.saveStatCardData()
+	                });
+	            });
+			    
 		new Setting(containerEl)
 			.setName('XP per character')
 			.setDesc('How much XP is earned for each character typed.')

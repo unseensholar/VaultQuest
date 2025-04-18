@@ -2,6 +2,7 @@ export interface GamifyPluginSettings {
     userFavicon?: string;
     xpPerCharacter: number;
     pointsBaseValue: number;
+    levelling_difficulty: number;
     tagMultipliers: Record<string, number>;
     apiUrl: string;
     apiKey: string;

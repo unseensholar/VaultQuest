@@ -6,9 +6,10 @@ import { ThemeService } from '../features/themeService';
 export class LLMTaskService {
     private plugin: GamifyPlugin;
     private keyPressCount: number = 0;
+    private totalCharactersTyped: number = 0;
     private keyboardListener: (e: KeyboardEvent) => void;
     private intervalId: number | null = null;
-
+	
     constructor(plugin: GamifyPlugin) {
         this.plugin = plugin;
         
@@ -20,20 +21,18 @@ export class LLMTaskService {
         this.intervalId = window.setInterval(() => this.updateFileFolderCounts(), 60000*5); // Check every 5 minutes
     }
 
-    private handleKeyPress(e: KeyboardEvent): void {
-        if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter') {
-            this.keyPressCount++;
-            
-            if (this.keyPressCount >= 50) {
-                try {
-                    this.updateWritingSkill(this.keyPressCount);
-                    this.keyPressCount = 0;
-                } catch (error) {
-                    console.error("Error updating writing skill:", error);
-                }
-            }
-        }
-    }
+	private handleKeyPress(e: KeyboardEvent): void {
+		if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter') {
+			this.keyPressCount++;
+			this.totalCharactersTyped = this.plugin.statCardData.writingStats.totalCharactersTyped;
+
+			if (this.keyPressCount >= 50) {
+				this.updateWritingSkill(this.totalCharactersTyped);
+			}
+
+			
+		}
+	}
 
     private async updateFileFolderCounts(): Promise<void> {
         try {
@@ -68,13 +67,13 @@ export class LLMTaskService {
         }
     }
 
-    private updateWritingSkill(keyCount: number): void {
-        const skill = this.plugin.statCardData.skills.find(s => s.id === "writing");
-        if (skill) {
-            const xpGain = Math.floor(keyCount / 1);
-            this.updateSkill(skill, xpGain);
-        }
-    }
+	private updateWritingSkill(totalCharactersTyped: number): void {
+		const skill = this.plugin.statCardData.skills.find(s => s.id === "writing");
+		if (skill) {
+			const result = this.getLevelForCount(totalCharactersTyped, 50, 25); // Base: 50 chars for level 1, +25 chars per level
+			this.setSkillLevel(skill, result.level, result.progress);
+		}
+	}
 
     private getRequiredCountForLevel(level: number, baseCount: number, incrementFactor: number): number {
         let total = 0;
@@ -134,33 +133,9 @@ export class LLMTaskService {
         if (newLevel > oldLevel) {
             const pointsGained = (newLevel - oldLevel) * 2;
             this.plugin.statCardData.points += pointsGained;
-            new Notice(`Your ${skill.name} skill has increased to level ${skill.level}!`);
-        }
-    }
-
-    private updateSkill(skill: any, xpAmount: number): void {
-        if (xpAmount <= 0) return;
-        
-        if (this.plugin.statCardData.activeEffects?.xpMultiplier) {
-            const multiplier = this.plugin.statCardData.activeEffects.xpMultiplier;
-            const now = Date.now();
-            
-            if (multiplier.expiresAt > now) {
-                xpAmount = Math.floor(xpAmount * multiplier.value);
-            }
-        }
-        
-        skill.xp += xpAmount;
-        
-        const nextLevel = skill.level + 1;
-        const xpForNextLevel = Math.floor(100 + 25 * nextLevel + Math.pow(nextLevel, 2) * 2);
-        
-        if (skill.xp >= xpForNextLevel) {
-            skill.level = nextLevel;
-            skill.xp = 0;
-            new Notice(`Your ${skill.name} skill has increased to level ${skill.level}!`);
-            
-            this.plugin.statCardData.points += nextLevel * 2;
+			setTimeout(() => {
+				new Notice(`Your ${skill.name} skill has increased to level ${skill.level}!`);
+			}, 10000);			
         }
     }
 
