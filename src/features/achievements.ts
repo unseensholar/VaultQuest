@@ -258,13 +258,6 @@ export class AchievementsService {
         const defaultAchievements = JSON.stringify([
             {
                 "id": "Hello World",
-                "name": "Hello World",
-                "description": "Write something",
-                "condition": { "type": "writing", "value": 1 },
-                "reward": { "type": "points", "value": 100 }
-            }
-            {
-                "id": "Hello World",
                 "name": "Hello World!",
                 "description": "Write something for beginner's bonus.",
                 "condition": { "type": "writing", "value": 1 },
