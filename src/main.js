@@ -4228,12 +4228,12 @@ function addNotificationSettingsUI(containerEl, plugin, notificationListener, se
 
 // settings/settings-tab.ts
 var difficultyLevels = {
-  "Very Easy": 1,
-  Easy: 2,
-  Normal: 3,
-  Hard: 4,
-  "Very Hard": 5,
-  Brutal: 6
+  "Very Easy": 0,
+  Easy: 1e-3,
+  Normal: 0.01,
+  Hard: 0.025,
+  "Very Hard": 0.05,
+  Brutal: 0.1
 };
 var GamifySettingTab = class extends import_obsidian14.PluginSettingTab {
   constructor(app, plugin) {
