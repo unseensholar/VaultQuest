@@ -4,6 +4,14 @@ import { DebugMenu } from '../debug/DebugMenu';
 import { AchievementsService } from '../features/achievements';
 import { NotificationListener, addNotificationSettingsUI } from '../support/notificationListener';
 
+const difficultyLevels = {
+    "Very Easy": 0,
+    "Easy": 0.001,
+    "Normal": 0.01,
+    "Hard": 0.025,
+    "Very Hard": 0.05,
+    "Brutal": 0.1,
+};
 
 export class GamifySettingTab extends PluginSettingTab {
 	plugin: GamifyPlugin;
@@ -64,6 +72,27 @@ export class GamifySettingTab extends PluginSettingTab {
                 text: 'You do not have permission to modify this settings.'
             });
         }		
+		new Setting(containerEl)
+	            .setName("Leveling Difficulty")
+	            .setDesc("Adjust the XP scaling difficulty for leveling.")
+	            .addDropdown((dropdown) => {
+	                Object.keys(difficultyLevels).forEach((level) => {
+	                    dropdown.addOption(level, level);
+	                });
+	
+	                dropdown.setValue(
+	                    Object.keys(difficultyLevels).find(
+	                        (key) =>
+	                            difficultyLevels[key] === this.plugin.settings.levelling_difficulty
+	                    ) || "Hard"
+	                );
+	
+	                dropdown.onChange(async (value) => {
+	                    this.plugin.settings.levelling_difficulty = difficultyLevels[value];
+	                    await this.plugin.saveSettings();
+	                });
+	            });
+			    
 		new Setting(containerEl)
 			.setName('XP per character')
 			.setDesc('How much XP is earned for each character typed.')
