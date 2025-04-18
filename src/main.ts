@@ -20,6 +20,7 @@ type DifficultyLevel = "very_hard" | "hard" | "medium" | "easy";
 const DEFAULT_SETTINGS: GamifyPluginSettings = {
 	xpPerCharacter: 0.1,
 	pointsBaseValue: 10,
+	levelling_difficulty: 0.01,
 	tagMultipliers: {
 		'#easy': 0.5,
 		'#medium': 1.0,
@@ -634,8 +635,9 @@ export default class GamifyPlugin extends Plugin {
 			this.statCardData.level++;
 			
 			// Increase required XP for next level
-			this.statCardData.nextLevelXp = Math.round(this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * 0.05));
-			
+			this.statCardData.nextLevelXp = Math.round(
+    this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * this.settings.levelling_difficulty)
+);
 			new Notice(`Congratulations! You reached level ${this.statCardData.level}!`);
 			const levelUpReward = Math.round(10 + (this.statCardData.level * 2) + (this.statCardData.level ** 1.5));
 			this.statCardData.points += levelUpReward;
