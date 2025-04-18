@@ -43,7 +43,11 @@ export class DebugMenu extends Modal {
 
         this.createStatControl(section, "Level", () => this.plugin.statCardData.level, (val) => { 
             this.plugin.statCardData.level = val; 
-            this.plugin.statCardData.nextLevelXp = Math.round(100 * Math.pow(1.1 + val * 0.05, val - 1));
+			let baseXp = 100;
+			for (let i = 1; i < val; i++) {
+				baseXp *= (1.1 + i * this.plugin.settings.levelling_difficulty);
+			}					
+			this.plugin.statCardData.nextLevelXp = Math.round(baseXp)            
         });
 
         this.createStatControl(section, "Points", () => this.plugin.statCardData.points, (val) => {
