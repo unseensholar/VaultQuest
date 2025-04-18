@@ -13,6 +13,11 @@ Now, VaultQuest includes an XP system, reward points, a skill system, and an AI-
 ---
 
 ## Changelog
+### v0.6.1 - Patch (Patch 1 @unseensholar in #6)
+- Added Level Up Difficulty in Settings. (request by lulunac27a commented Apr 18, 2025)
+- Fixes: Issue with Achievements folder creation failing. Added new Achievements to default list.
+- Fixes: Issue with Writing skill update showing multiple level up notifications and level rollback.
+
 ### v0.6.0 - Major Feature Update
 - Added Item Crafter - Menu to create items and add them to the store.
 - BRAT support.
