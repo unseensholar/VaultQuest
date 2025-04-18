@@ -4604,7 +4604,7 @@ var GamifySettingTab = class extends import_obsidian14.PluginSettingTab {
     containerEl.createEl("h2", { text: "Debug Settings" });
     new import_obsidian14.Setting(containerEl).setName("Enable Debug Mode").setDesc("Enables debug features.").addToggle((toggle) => {
       toggle.setValue(this.plugin.settings.debugMode);
-      if (!this.hasSystemControlAccess()) {
+      if (!this.hasSystemControlAccess() && !this.plugin.hasDebugPermission) {
         toggle.setDisabled(true);
         toggle.toggleEl.title = "Permission Required.";
       } else {
