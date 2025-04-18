@@ -634,7 +634,7 @@ export default class GamifyPlugin extends Plugin {
 			this.statCardData.level++;
 			
 			// Increase required XP for next level
-			this.statCardData.nextLevelXp = Math.round(this.statCardData.nextLevelXp * (1.1 + this.statCardData.level * 0.05));
+			this.statCardData.nextLevelXp = Math.round(this.statCardData.nextLevelXp * (1.1));
 			
 			new Notice(`Congratulations! You reached level ${this.statCardData.level}!`);
 			const levelUpReward = Math.round(10 + (this.statCardData.level * 2) + (this.statCardData.level ** 1.5));
