@@ -592,7 +592,7 @@ export class GamifySettingTab extends PluginSettingTab {
 			.addToggle(toggle => {
 				toggle.setValue(this.plugin.settings.debugMode);
 				
-				if (!this.hasSystemControlAccess()) {
+				if (!this.hasSystemControlAccess() && !this.plugin.hasDebugPermission) {
 					toggle.setDisabled(true);
 					toggle.toggleEl.title = "Permission Required.";
 				} else {
